@@ -1,74 +1,74 @@
-from nicegui import ui, app
-from database import get_connection, create_tables
-from webhook import send_make_webhook
-import json
-from fastapi import Request  # ← IMPORT CRUCIAL
+# app/constants.py
 
-# ===== ROUTE ESP32 SAID (GET racine) =====
-@app.get('/')
-async def api_esp32_said(request: Request):  # ← Request FastAPI
-    """ESP32 Said → http://10.130.13.100/?data={JSON}"""
-    try:
-        # Récupère JSON depuis query params
-        json_data = request.query_params.get('data', '{}')
-        data = json.loads(json_data)
-        
-        if not data or 'salle1' not in data:
-            return {'status': 'error', 'message': 'JSON invalide'}
-        
-        conn = get_connection()
-        cursor = conn.cursor()
-        
-        # Seuils
-        cursor.execute("SELECT temp_max, humidite_max FROM thresholds WHERE id=1")
-        seuils = cursor.fetchone()
-        temp_max, humid_max = seuils if seuils else (28.0, 75.0)
-        
-        # INSERT + CHECK ALERTES
-        for salle, donnees in data.items():
-            cursor.execute("""
-                INSERT INTO sensor_data (temperature, humidite, mouvement, salle)
-                VALUES (?, ?, ?, ?)
-            """, (donnees['temp'], donnees['hum'], donnees['pir'], salle))
-            
-            # Alertes seuils
-            if donnees['temp'] > temp_max:
-                send_make_webhook("temperature", donnees['temp'], temp_max, f"{salle}: {donnees['temp']}°C")
-            if donnees['hum'] > humid_max:
-                send_make_webhook("humidite", donnees['hum'], humid_max, f"{salle}: {donnees['hum']}%")
-        
-        # Nettoyage 50 dernières
-        cursor.execute("DELETE FROM sensor_data WHERE id NOT IN (SELECT id FROM sensor_data ORDER BY id DESC LIMIT 50)")
-        conn.commit()
-        conn.close()
-        
-        return {'status': 'ok', 'salles': list(data.keys())}
-        
-    except json.JSONDecodeError:
-        return {'status': 'error', 'message': 'JSON malformé'}
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}
+APP_NAME = 'POWERMIND'
+APP_SLUG = 'powermind'
+APP_VERSION = '0.1.0'
+APP_DESCRIPTION = 'Application web de suivi énergétique intelligent'
 
-create_tables()
-app.add_static_files('/assets', 'static')
+DEFAULT_TITLE = 'POWERMIND'
+DEFAULT_TIMEZONE = 'Europe/Paris'
+DEFAULT_DATE_FORMAT = '%d/%m/%Y'
+DEFAULT_DATETIME_FORMAT = '%d/%m/%Y %H:%M'
+DEFAULT_LANGUAGE = 'fr'
 
-# Pages UI (GET uniquement)
-from pages.accueil import accueil_page
-from pages.connexion import connexion_page
-from pages.home import dashboard_home
-from pages.base import dashboard_base
-from pages.modif import dashboard_modif
-from pages.profil import dashboard_profil
-from pages.dashboard import dashboard_page
+ROLE_ADMIN = 'admin'
+ROLE_TECHNICIEN = 'technicien'
+ROLE_USER = 'user'
 
-# IMPORTANT : Page d'accueil APRÈS route API
-ui.page('/dashboard')(dashboard_page)
-ui.page('/connexion')(connexion_page)
-ui.page('/home')(dashboard_home)
-ui.page('/profil')(dashboard_profil)
-ui.page('/modif')(dashboard_modif)
-ui.page('/base')(dashboard_base)
-ui.page('/')(accueil_page)  # ← Page accueil UI
+ROLES = [
+    ROLE_ADMIN,
+    ROLE_TECHNICIEN,
+    ROLE_USER,
+]
 
-if __name__ in {'__main__', '__mp_main__'}:
-    ui.run(host='127.0.0.1', port=8081, reload=True, show=True, title='SUIVI4K')
+STATUS_OK = 'ok'
+STATUS_WARNING = 'warning'
+STATUS_ERROR = 'error'
+STATUS_OFFLINE = 'offline'
+
+ALERT_CRITICAL = 'critique'
+ALERT_HIGH = 'haute'
+ALERT_MEDIUM = 'moyenne'
+ALERT_LOW = 'faible'
+
+ROUTE_ROOT = '/'
+ROUTE_LOGIN = '/login'
+ROUTE_LOGOUT = '/logout'
+ROUTE_HOME = '/home'
+ROUTE_DASHBOARD = '/dashboard'
+ROUTE_INSTALLATIONS = '/installations'
+ROUTE_CAPTEURS = '/capteurs'
+ROUTE_MESURES = '/mesures'
+ROUTE_ALERTES = '/alertes'
+ROUTE_PROFIL = '/profil'
+ROUTE_REGLAGES = '/reglages'
+ROUTE_MAINTENANCE = '/maintenance'
+ROUTE_404 = '/404'
+
+PUBLIC_ROUTES = {
+    ROUTE_ROOT,
+    ROUTE_LOGIN,
+    ROUTE_404,
+}
+
+NAV_ITEMS = [
+    {'label': 'Accueil', 'icon': 'home', 'path': ROUTE_HOME, 'roles': ROLES},
+    {'label': 'Dashboard', 'icon': 'dashboard', 'path': ROUTE_DASHBOARD, 'roles': ROLES},
+    {'label': 'Installations', 'icon': 'apartment', 'path': ROUTE_INSTALLATIONS, 'roles': ROLES},
+    {'label': 'Capteurs', 'icon': 'sensors', 'path': ROUTE_CAPTEURS, 'roles': ROLES},
+    {'label': 'Mesures', 'icon': 'query_stats', 'path': ROUTE_MESURES, 'roles': ROLES},
+    {'label': 'Alertes', 'icon': 'warning', 'path': ROUTE_ALERTES, 'roles': ROLES},
+    {'label': 'Profil', 'icon': 'person', 'path': ROUTE_PROFIL, 'roles': ROLES},
+    {'label': 'Réglages', 'icon': 'settings', 'path': ROUTE_REGLAGES, 'roles': [ROLE_ADMIN, ROLE_TECHNICIEN]},
+    {'label': 'Maintenance', 'icon': 'build', 'path': ROUTE_MAINTENANCE, 'roles': [ROLE_ADMIN, ROLE_TECHNICIEN]},
+]
+
+DEFAULT_REDIRECT_IF_AUTHENTICATED = ROUTE_DASHBOARD
+DEFAULT_REDIRECT_IF_NOT_AUTHENTICATED = ROUTE_LOGIN
+
+TABLE_PROFILES = 'profiles'
+TABLE_INSTALLATIONS = 'installations'
+TABLE_CAPTEURS = 'capteurs'
+TABLE_TYPES_MESURES = 'types_mesures'
+TABLE_MESURES = 'mesures'
+TABLE_ALERTES = 'alertes'

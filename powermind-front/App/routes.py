@@ -1,74 +1,104 @@
-from nicegui import ui, app
-from database import get_connection, create_tables
-from webhook import send_make_webhook
-import json
-from fastapi import Request  # ← IMPORT CRUCIAL
+# app/routes.py
 
-# ===== ROUTE ESP32 SAID (GET racine) =====
-@app.get('/')
-async def api_esp32_said(request: Request):  # ← Request FastAPI
-    """ESP32 Said → http://10.130.13.100/?data={JSON}"""
-    try:
-        # Récupère JSON depuis query params
-        json_data = request.query_params.get('data', '{}')
-        data = json.loads(json_data)
-        
-        if not data or 'salle1' not in data:
-            return {'status': 'error', 'message': 'JSON invalide'}
-        
-        conn = get_connection()
-        cursor = conn.cursor()
-        
-        # Seuils
-        cursor.execute("SELECT temp_max, humidite_max FROM thresholds WHERE id=1")
-        seuils = cursor.fetchone()
-        temp_max, humid_max = seuils if seuils else (28.0, 75.0)
-        
-        # INSERT + CHECK ALERTES
-        for salle, donnees in data.items():
-            cursor.execute("""
-                INSERT INTO sensor_data (temperature, humidite, mouvement, salle)
-                VALUES (?, ?, ?, ?)
-            """, (donnees['temp'], donnees['hum'], donnees['pir'], salle))
-            
-            # Alertes seuils
-            if donnees['temp'] > temp_max:
-                send_make_webhook("temperature", donnees['temp'], temp_max, f"{salle}: {donnees['temp']}°C")
-            if donnees['hum'] > humid_max:
-                send_make_webhook("humidite", donnees['hum'], humid_max, f"{salle}: {donnees['hum']}%")
-        
-        # Nettoyage 50 dernières
-        cursor.execute("DELETE FROM sensor_data WHERE id NOT IN (SELECT id FROM sensor_data ORDER BY id DESC LIMIT 50)")
-        conn.commit()
-        conn.close()
-        
-        return {'status': 'ok', 'salles': list(data.keys())}
-        
-    except json.JSONDecodeError:
-        return {'status': 'error', 'message': 'JSON malformé'}
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}
+from nicegui import ui
 
-create_tables()
-app.add_static_files('/assets', 'static')
+from app.constants import (
+    DEFAULT_REDIRECT_IF_AUTHENTICATED,
+    DEFAULT_REDIRECT_IF_NOT_AUTHENTICATED,
+    ROUTE_404,
+    ROUTE_ALERTES,
+    ROUTE_CAPTEURS,
+    ROUTE_DASHBOARD,
+    ROUTE_HOME,
+    ROUTE_INSTALLATIONS,
+    ROUTE_LOGIN,
+    ROUTE_LOGOUT,
+    ROUTE_MAINTENANCE,
+    ROUTE_MESURES,
+    ROUTE_PROFIL,
+    ROUTE_REGLAGES,
+    ROUTE_ROOT,
+)
+from app.pages.alertes_page import alertes_page
+from app.pages.capteurs_page import capteurs_page
+from app.pages.dashboard_page import dashboard_page
+from app.pages.home_page import home_page
+from app.pages.installations_page import installations_page
+from app.pages.login_page import login_page
+from app.pages.maintenance_page import maintenance_page
+from app.pages.mesures_page import mesures_page
+from app.pages.profil_page import profil_page
+from app.pages.reglages_page import reglages_page
 
-# Pages UI (GET uniquement)
-from pages.accueil import accueil_page
-from pages.connexion import connexion_page
-from pages.home import dashboard_home
-from pages.base import dashboard_base
-from pages.modif import dashboard_modif
-from pages.profil import dashboard_profil
-from pages.dashboard import dashboard_page
 
-# IMPORTANT : Page d'accueil APRÈS route API
-ui.page('/dashboard')(dashboard_page)
-ui.page('/connexion')(connexion_page)
-ui.page('/home')(dashboard_home)
-ui.page('/profil')(dashboard_profil)
-ui.page('/modif')(dashboard_modif)
-ui.page('/base')(dashboard_base)
-ui.page('/')(accueil_page)  # ← Page accueil UI
+def is_authenticated() -> bool:
+    """
+    À brancher plus tard sur Supabase/Auth réelle.
+    Pour l'instant, retourne False par défaut.
+    """
+    return False
 
-if __name__ in {'__main__', '__mp_main__'}:
-    ui.run(host='127.0.0.1', port=8081, reload=True, show=True, title='SUIVI4K')
+
+def redirect_to_default_page() -> None:
+    if is_authenticated():
+        ui.navigate.to(DEFAULT_REDIRECT_IF_AUTHENTICATED)
+    ui.navigate.to(DEFAULT_REDIRECT_IF_NOT_AUTHENTICATED)
+
+
+def register_routes() -> None:
+    @ui.page(ROUTE_ROOT)
+    def root_page():
+        redirect_to_default_page()
+
+    @ui.page(ROUTE_LOGIN)
+    def login():
+        login_page()
+
+    @ui.page(ROUTE_LOGOUT)
+    def logout():
+        ui.notify('Déconnexion en cours...', type='info')
+        ui.navigate.to(ROUTE_LOGIN)
+
+    @ui.page(ROUTE_HOME)
+    def home():
+        home_page()
+
+    @ui.page(ROUTE_DASHBOARD)
+    def dashboard():
+        dashboard_page()
+
+    @ui.page(ROUTE_INSTALLATIONS)
+    def installations():
+        installations_page()
+
+    @ui.page(ROUTE_CAPTEURS)
+    def capteurs():
+        capteurs_page()
+
+    @ui.page(ROUTE_MESURES)
+    def mesures():
+        mesures_page()
+
+    @ui.page(ROUTE_ALERTES)
+    def alertes():
+        alertes_page()
+
+    @ui.page(ROUTE_PROFIL)
+    def profil():
+        profil_page()
+
+    @ui.page(ROUTE_REGLAGES)
+    def reglages():
+        reglages_page()
+
+    @ui.page(ROUTE_MAINTENANCE)
+    def maintenance():
+        maintenance_page()
+
+    @ui.page(ROUTE_404)
+    def not_found():
+        with ui.column().classes('w-full h-screen items-center justify-center gap-4'):
+            ui.icon('error_outline').classes('text-6xl text-red-500')
+            ui.label('404 - Page non trouvée').classes('text-2xl font-bold')
+            ui.label('La page demandée n’existe pas ou n’est plus disponible.').classes('text-gray-500')
+            ui.button('Retour au dashboard', on_click=lambda: ui.navigate.to(ROUTE_DASHBOARD))

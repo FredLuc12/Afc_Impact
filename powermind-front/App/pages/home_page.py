@@ -1,65 +1,90 @@
 from nicegui import ui
-from database import get_connection
-from pages.connexion import user_session
-from components.layout import create_dashboard_layout
 
-def home_content():
-    """Contenu page Home avec stats BDD."""
-    with ui.column().classes('gap-8 w-full'):
-        ui.label('Bienvenue dans votre dashboard SUIVI4K !').classes('text-3xl text-gray-700 font-light')
-        
-        # Stats BDD
-        if not user_session['user_id']:
-            nb_alertes_actives = 0
-            alertes_aujourdhui = 0 
-            statut_global = 'Non connecté'
-        else:
-            try:
-                conn = get_connection()
-                cursor = conn.cursor()
-                
-                # Compteur alertes actives (non résolues)
-                cursor.execute("SELECT COUNT(*) as count FROM alerts WHERE resolved = 0")
-                nb_alertes_actives = cursor.fetchone()[0]
-                
-                # Statut global
-                cursor.execute("""
-                    SELECT COUNT(*) as total_alertes 
-                    FROM alerts 
-                    WHERE created_at > datetime('now', '-1 day')
-                """)
-                alertes_aujourdhui = cursor.fetchone()[0]
-                
-                conn.close()
-            except:
-                nb_alertes_actives = 0
-                alertes_aujourdhui = 0
-        
-        # Cards rapides avec DONNÉES RÉELLES
-        with ui.row().classes('gap-6 w-full'):
-            # STATUT GLOBAL
-            with ui.card().classes('flex-1 p-8 shadow-xl rounded-3xl'):
-                ui.icon('dashboard', color='green').classes('text-5xl mx-auto mb-4')
-                ui.label('Statut').classes('text-3xl font-bold text-center text-green-600')
-                
-                if nb_alertes_actives == 0:
-                    ui.label('OK').classes('text-xl text-center text-green-800')
-                else:
-                    ui.label(f' {nb_alertes_actives} alerte(s) active(s)').classes('text-xl text-center text-orange-700')
-            
-            # ALERTES
-            with ui.card().classes('flex-1 p-8 shadow-xl rounded-3xl'):
-                ui.icon('notifications', color='orange').classes('text-5xl mx-auto mb-4')
-                ui.label('Alertes').classes('text-3xl font-bold text-center text-orange-600')
-                ui.label(f'{nb_alertes_actives} actif').classes('text-xl text-center text-orange-800')
-            
-            # ALERTES JOUR
-            with ui.card().classes('flex-1 p-8 shadow-xl rounded-3xl'):
-                ui.icon('today', color='blue').classes('text-5xl mx-auto mb-4')
-                ui.label('Aujourd\'hui').classes('text-3xl font-bold text-center text-blue-600')
-                ui.label(f'{alertes_aujourdhui} alertes').classes('text-xl text-center text-blue-800')
+from app.layouts.app_layout import app_layout
+from app.components.action_button import render_action_button
 
-@ui.page('/dashboard/home')
-def dashboard_home():
-    ui.page_title('SUIVI4K - Accueil')
-    create_dashboard_layout('Home', home_content)
+
+def home_page() -> None:
+    def content() -> None:
+        ui.add_head_html('''
+        <style>
+            .pm-landing-wrap {
+                min-height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                text-align: center;
+            }
+            .pm-brand-zone {
+                margin-top: 34px;
+            }
+            .pm-brand-mark {
+                font-size: 1.8rem;
+                font-weight: 800;
+                color: #1f5ca8;
+                margin-bottom: 10px;
+            }
+            .pm-brand-sub {
+                font-size: 1.15rem;
+                font-weight: 700;
+                color: #7ebe4e;
+                letter-spacing: .05em;
+            }
+            .pm-landing-meta {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+                margin-top: 40px;
+                text-align: left;
+                color: #3f4854;
+                font-size: .84rem;
+            }
+            .pm-landing-mode {
+                color: #b1b7bf;
+                font-size: .8rem;
+                margin-top: 2px;
+            }
+            .pm-landing-actions {
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+                margin: 34px 0 26px 0;
+            }
+            .pm-landing-footer {
+                text-align: center;
+                color: #bcc2ca;
+                font-size: .88rem;
+                margin-top: auto;
+                margin-bottom: 16px;
+            }
+            .pm-power-icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 18px auto 8px auto;
+                font-size: 4rem;
+                color: #111111;
+            }
+        </style>
+        ''')
+
+        with ui.element('div').classes('pm-landing-wrap'):
+            with ui.element('div').classes('pm-brand-zone'):
+                ui.label('AFS Impact').classes('pm-brand-mark')
+                ui.label('POWER MIND').classes('pm-brand-sub')
+
+            with ui.element('div').classes('pm-landing-meta'):
+                with ui.column().classes('gap-0'):
+                    ui.label('Date/Heure')
+                    ui.label('Mode: AUTO').classes('pm-landing-mode')
+                ui.label('Température intérieur')
+                ui.label('Température extérieur')
+
+            with ui.element('div').classes('pm-landing-actions'):
+                render_action_button('Accéder au chauffage', on_click=lambda: ui.navigate.to('/dashboard'), color='green')
+                render_action_button('Accéder aux paramètres', on_click=lambda: ui.navigate.to('/login'), color='coral')
+
+            ui.label('Impact environnemental').classes('pm-landing-footer')
+            ui.icon('power_settings_new').classes('pm-power-icon')
+
+    app_layout(content)
