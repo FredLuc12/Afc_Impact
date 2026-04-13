@@ -4,7 +4,7 @@ from nicegui import ui
 DEFAULT_NAV_ITEMS = [
     {'label': 'Home', 'icon': 'home', 'path': '/home'},
     {'label': 'Consommation', 'icon': 'bar_chart', 'path': '/consommation', 'active': True},
-    {'label': 'Modifier H/D', 'icon': 'calendar_month', 'path': '/heure-date'},
+    {'label': 'Modifier H/D', 'icon': 'calendar_month', 'path': '/date-heure'},
     {'label': 'Valeurs bases', 'icon': 'tune', 'path': '/valeurs-bases'},
     {'label': 'Reset', 'icon': 'restart_alt', 'path': '/reset'},
 ]
