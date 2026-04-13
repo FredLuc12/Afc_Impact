@@ -12,6 +12,7 @@ from app.constants import (
     ROUTE_HOME,
     ROUTE_INSTALLATIONS,
     ROUTE_LOGIN,
+    ROUTE_REGISTER,
     ROUTE_LOGOUT,
     ROUTE_MAINTENANCE,
     ROUTE_MESURES,
@@ -25,6 +26,7 @@ from app.pages.dashboard_page import dashboard_page
 from app.pages.home_page import home_page
 from app.pages.installations_page import installations_page
 from app.pages.login_page import login_page
+from app.pages.register_page import register_page
 from app.pages.maintenance_page import maintenance_page
 from app.pages.mesures_page import mesures_page
 from app.pages.profil_page import profil_page
@@ -54,6 +56,10 @@ def register_routes() -> None:
     def login():
         login_page()
 
+    @ui.page(ROUTE_REGISTER)
+    def register():
+        register_page()
+    
     @ui.page(ROUTE_LOGOUT)
     def logout():
         ui.notify('Déconnexion en cours...', type='info')

@@ -33,6 +33,7 @@ ALERT_LOW = 'faible'
 
 ROUTE_ROOT = '/'
 ROUTE_LOGIN = '/login'
+ROUTE_REGISTER = '/register'
 ROUTE_LOGOUT = '/logout'
 ROUTE_HOME = '/home'
 ROUTE_DASHBOARD = '/dashboard'
@@ -48,6 +49,7 @@ ROUTE_404 = '/404'
 PUBLIC_ROUTES = {
     ROUTE_ROOT,
     ROUTE_LOGIN,
+    ROUTE_REGISTER,
     ROUTE_404,
 }
 
