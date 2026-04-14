@@ -100,8 +100,8 @@ def consommation_page() -> None:
             'margin-top: 6px; border-top: 1px solid #e7e7e7; padding-top: 16px;'
         ):
             for label, value, color in [
-                ('Current Week', 64, '#72d7a0'),
-                ('Last Month', 90, '#5f6ae9'),
+                ('Consommation en cours', 64, '#72d7a0'),
+                ('Consommation hier', 90, '#5f6ae9'),
             ]:
                 with ui.column().classes('items-center').style('width: 46%; gap: 10px;'):
                     ui.label(label).classes('pm-ring-label')
@@ -116,7 +116,7 @@ def consommation_page() -> None:
             ):
                 ui.element('div')
                 with ui.column().classes('items-end').style('gap: 6px;'):
-                    ui.label('Lead Optimizations').style(
+                    ui.label('Optimisations des prospects').style(
                         'color:#3e4852;font-size:14px;font-weight:700;'
                     )
                     ui.element('div').style(
