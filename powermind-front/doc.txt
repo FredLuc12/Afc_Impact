@@ -1,0 +1,138 @@
+
+**Contexte :** Tu es un expert Fullstack travaillant sur l'application PowerMind (NiceGUI + Supabase). Voici la structure exacte de la base de données PostgreSQL pour gérer le pilotage énergétique intelligent.
+
+**Architecture des Tables (Schéma Public) :**
+
+1.  **`profiles`** : Utilisateurs de l'application.
+    * `id` (uuid, PK) : Identifiant unique.
+    * `email` (text) : Adresse de connexion.
+    * `role` (text) : 'admin' ou 'user'.
+2.  **`installations`** : Sites physiques (maisons/bâtiments).
+    * `id` (uuid, PK).
+    * `user_id` (uuid, FK) ➔ `profiles.id`.
+    * `nom` (text) : Nom du site (ex: "Installation Test").
+3.  **`capteurs`** : Matériel physique installé.
+    * `id` (uuid, PK).
+    * `installation_id` (uuid, FK) ➔ `installations.id`.
+    * `type` (text) : Catégorie (ex: "meteo").
+    * `nom` (text) : Nom personnalisé (ex: "Capteur Meteo 1").
+4.  **`types_mesure`** : Dictionnaire des grandeurs physiques.
+    * `id` (int2, PK) : 1=co2, 2=humidite, 3=temperature, 4=presence.
+    * `code` (text) : Identifiant court.
+    * `unite` (text) : Unité de mesure (ppm, %, degC, bool).
+5.  **`mesures`** : Données temps réel envoyées par les capteurs.
+    * `id` (int8, PK).
+    * `capteur_id` (uuid, FK) ➔ `capteurs.id`.
+    * `type_mesure_id` (int2, FK) ➔ `types_mesure.id`.
+    * `value` (int8) : La donnée brute.
+6.  **`choix_auto`** : Registre des modes de pilotage choisis.
+    * `id` (int8, PK).
+    * `choix` (text) : Mode actif (ex: "electric").
+7.  **`alertes`** : Journal des anomalies.
+    * `id` (int8, PK).
+    * `capteur_id` (uuid, FK) ➔ `capteurs.id`.
+    * `message` (text) : Description de l'alerte.
+8.  **`notes_user`** : Commentaires libres.
+    * `user_id` (uuid, FK) ➔ `profiles.id`.
+
+**Logique de Jointure (Crucial pour le code) :**
+* Pour obtenir la valeur d'une température pour un utilisateur : 
+    `profile` ➔ `installations` ➔ `capteurs` ➔ `mesures` ➔ filtrer sur `type_mesure_id = 3`.
+
+---
+
+### 💡 Analyse de tes captures :
+J'ai remarqué deux petits détails pour ton code Python :
+* **Table `choix_auto`** : Ta capture montre une colonne nommée **`choix`** (qui contient "electric"), mais dans ton service Python, on cherchait une colonne `mode`. Il faudra bien utiliser `.eq('choix', ...)` dans ton code !
+* **Table `mesures`** : La colonne de donnée s'appelle **`value`** (en anglais), alors que ton service utilisait `valeur` (en français). 
+
+**Tu veux que je corrige tes services tout de suite avec ces noms exacts (choix, value) pour supprimer les dernières erreurs ?**
+
+
+C'est noté. Je me base sur tes fichiers `auth_service.py` et les captures d'écran de ta BDD pour corriger les services. 
+
+Comme tu l'as remarqué, il y a un décalage entre les noms dans ton code Python et les noms réels dans Supabase (`value` vs `valeur`, `choix` vs `mode`).
+
+Voici les corrections prioritaires à appliquer :
+
+### 1. Mise à jour de `AuthService` (`app/services/auth_service.py`)
+Dans ta fonction `login_user`, on doit s'assurer de récupérer l'installation et le profil avec les bons champs.
+
+```python
+# app/services/auth_service.py
+
+# ... (garder le début du fichier)
+
+    def login_user(self, identifier: str, password: str) -> dict:
+        # ... (logique de connexion auth.sign_in_with_password)
+        
+        if user_id:
+            # Récupération du profil
+            profile_res = self.supabase.table('profiles').select('*').eq('id', user_id).maybe_single().execute()
+            
+            # Récupération de l'installation
+            # On s'assure que le select est bien configuré
+            inst_res = self.supabase.table('installations') \
+                .select('*') \
+                .eq('user_id', user_id) \
+                .order('created_at', desc=True) \
+                .limit(1) \
+                .maybe_single() \
+                .execute()
+```
+
+### 2. Mise à jour de `MesureService` (`app/services/mesure_service.py`)
+C'est ici que le changement `value` est critique. Ta table `mesures` utilise la colonne `value`.
+
+```python
+# app/services/mesure_service.py
+
+class MesureService:
+    # ... init ...
+
+    def list_by_installation(self, installation_id: UUID, limit: int = 100):
+        # Correction : on récupère 'value' et on joint 'types_mesure' pour avoir le code/unité
+        return self.supabase.table('mesures') \
+            .select('''
+                id,
+                value,
+                created_at,
+                capteur_id,
+                types_mesure:type_mesure_id (
+                    code,
+                    unite
+                )
+            ''') \
+            .eq('capteurs.installation_id', str(installation_id)) \
+            .order('created_at', desc=True) \
+            .limit(limit) \
+            .execute()
+```
+
+### 3. Mise à jour de `ChoixAutoService` (`app/services/choix_auto_service.py`)
+Ta capture d'écran montre que la colonne s'appelle `choix` et non `mode`.
+
+```python
+# app/services/choix_auto_service.py
+
+class ChoixAutoService:
+    # ... init ...
+
+    def get_latest_by_installation(self, installation_id: UUID):
+        # Correction : utiliser la colonne 'choix'
+        res = self.supabase.table('choix_auto') \
+            .select('id, choix, created_at') \
+            .eq('installation_id', str(installation_id)) \
+            .order('created_at', desc=True) \
+            .limit(1) \
+            .maybe_single() \
+            .execute()
+        return res.data
+```
+
+### ⚠️ Pourquoi c'est important ?
+Si ton code cherche `.mode` ou `.valeur`, Supabase renverra `None` ou une erreur, ce qui cause :
+1. L'affichage "Non disponible" sur ta home page.
+2. Des crashs potentiels dans tes calculs énergétiques.
+
+**Une fois que ces services sont alignés sur la BDD, veux-tu que je m'attaque au correctif du Middleware dans `security.py` pour stopper définitivement la boucle infinie au clic sur "Accéder au chauffage" ?**

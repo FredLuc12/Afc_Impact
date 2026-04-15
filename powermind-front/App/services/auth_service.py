@@ -55,22 +55,19 @@ class AuthService:
         installation = None
 
         if user_id:
-            # 2. Récupération du profil (Sécurisée)
-            try:
+            if user_id:
+            # Récupération du profil
                 profile_res = self.supabase.table('profiles').select('*').eq('id', user_id).maybe_single().execute()
-                if profile_res:
-                    profile = profile_res.data or {}
-            except Exception as e:
-                print(f"Erreur profil: {e}")
 
-            # 3. Récupération de l'installation (Sécurisée)
-            try:
-                inst_res = self.supabase.table('installations').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(1).maybe_single().execute()
-                # CORRECTION ICI : on vérifie que inst_res n'est pas None avant d'accéder à .data
-                if inst_res:
-                    installation = inst_res.data
-            except Exception as e:
-                print(f"Erreur installation: {e}")
+                # Récupération de l'installation
+                # On s'assure que le select est bien configuré
+                inst_res = self.supabase.table('installations') \
+                    .select('*') \
+                    .eq('user_id', user_id) \
+                    .order('created_at', desc=True) \
+                    .limit(1) \
+                    .maybe_single() \
+                    .execute()
 
         return {
             'success': True,
