@@ -1,4 +1,7 @@
 # app/pages/home_page.py
+# CORRECTIONS BDD:
+# - choix_auto: colonne 'choix' (pas '.mode'), pas de FK installation_id
+# - mesures: colonne 'value' (pas 'valeur'), jointure 'types_mesure' (pas 'types_mesures')
 
 from datetime import datetime
 from uuid import UUID
@@ -9,43 +12,46 @@ from app.components.action_button import render_action_button
 from app.core.session import SessionManager
 from app.services.mesure_service import MesureService
 from app.services.choix_auto_service import ChoixAutoService
-from app.constants import ROUTE_LOGIN, ROUTE_DASHBOARD, ROUTE_ADMIN, ROUTE_VALEURS_BASES
+from app.constants import ROUTE_LOGIN, ROUTE_DASHBOARD, ROUTE_VALEURS_BASES
+
 
 def home_page() -> None:
-    # --- LOGIQUE DE RÉCUPÉRATION DES DONNÉES ---
     mesure_service = MesureService()
     choix_service = ChoixAutoService()
-    
+
     inst_id_str = SessionManager.get_installation_id()
     inst_id = UUID(inst_id_str) if inst_id_str else None
 
     def content() -> None:
-        # 1. Sécurité des boutons
         def handle_navigation(target):
             if not SessionManager.is_authenticated():
                 ui.navigate.to(ROUTE_LOGIN)
                 return
             if target == 'chauffage':
-                # Si admin, on peut rediriger vers /admin/users ou le dashboard par défaut
                 path = f"{ROUTE_DASHBOARD}/{inst_id}" if inst_id else ROUTE_DASHBOARD
                 ui.navigate.to(path)
             else:
                 ui.navigate.to(ROUTE_VALEURS_BASES)
 
-        # 2. Données dynamiques
-        latest_choix = choix_service.get_latest_by_installation(inst_id) if inst_id else None
-        mode_text = latest_choix.mode.upper() if latest_choix else "MANUEL"
+        # Dernier choix auto global (pas de FK installation_id dans choix_auto)
+        latest_choix = choix_service.get_latest()
+        # Colonne 'choix' (pas '.mode') — valeurs: 'electric', 'gaz'
+        mode_text = latest_choix.choix.upper() if latest_choix else "MANUEL"
 
         temp_int = "N/A"
         temp_ext = "N/A"
         if inst_id:
             recent = mesure_service.list_by_installation(inst_id, limit=10)
             for m in recent:
-                code = m.get('types_mesures', {}).get('code')
-                if code == 'TEMP_INT': temp_int = f"{m['valeur']}°C"
-                if code == 'TEMP_EXT': temp_ext = f"{m['valeur']}°C"
+                # Jointure 'types_mesure' (sans 's' — nom réel BDD)
+                tm = m.get('types_mesure') or {}
+                code = tm.get('code')
+                # Colonne 'value' (pas 'valeur')
+                if code == 'TEMP_INT':
+                    temp_int = f"{m.get('value', '?')}°C"
+                if code == 'TEMP_EXT':
+                    temp_ext = f"{m.get('value', '?')}°C"
 
-        # --- TON DESIGN ORIGINAL ---
         ui.add_head_html('''
         <style>
             .pm-landing-wrap {
@@ -55,9 +61,7 @@ def home_page() -> None:
                 justify-content: space-between;
                 text-align: center;
             }
-            .pm-brand-zone {
-                margin-top: 34px;
-            }
+            .pm-brand-zone { margin-top: 34px; }
             .pm-brand-mark {
                 font-size: 1.8rem;
                 font-weight: 800;
@@ -115,28 +119,25 @@ def home_page() -> None:
 
             with ui.element('div').classes('pm-landing-meta'):
                 with ui.column().classes('gap-0'):
-                    # Date et Heure système
                     ui.label(datetime.now().strftime('%d/%m/%Y'))
                     ui.label(datetime.now().strftime('%H:%M')).style('font-weight: 700')
                     ui.label(f'Mode: {mode_text}').classes('pm-landing-mode')
-                
+
                 with ui.column().classes('gap-0'):
                     ui.label('Temp. intérieur')
                     ui.label(temp_int).style('font-weight: 700; font-size: 1rem')
-                
+
                 with ui.column().classes('gap-0'):
                     ui.label('Temp. extérieur')
                     ui.label(temp_ext).style('font-weight: 700; font-size: 1rem')
 
             with ui.element('div').classes('pm-landing-actions'):
-                # Boutons avec redirection sécurisée
-                render_action_button('Accéder au chauffage', 
-                                   on_click=lambda: handle_navigation('chauffage'), 
-                                   color='green')
-                
-                render_action_button('Accéder aux paramètres', 
-                                   on_click=lambda: handle_navigation('parametres'), 
-                                   color='coral')
+                render_action_button('Accéder au chauffage',
+                                     on_click=lambda: handle_navigation('chauffage'),
+                                     color='green')
+                render_action_button('Accéder aux paramètres',
+                                     on_click=lambda: handle_navigation('parametres'),
+                                     color='coral')
 
             ui.label('Impact environnemental').classes('pm-landing-footer')
             ui.icon('power_settings_new').classes('pm-power-icon')
