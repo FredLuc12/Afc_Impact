@@ -13,7 +13,7 @@ def get_weather(city="Paris"):
         "units": "metric" 
     }
 
-    response = requests.get(url, params=params)
+    response = requests.get(url.API_METEO, params=params)
     data = response.json()
 
     temp = data["main"]["temp"]
