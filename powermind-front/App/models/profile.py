@@ -1,33 +1,30 @@
 # app/models/profile.py
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import EmailStr
 
-from app.models.base import AppBaseModel, UserRole
+from app.models.base import AppBaseModel, UserRole, UUIDTimestampedModel, UUIDModel
 
 
-class Profile(AppBaseModel):
-    id: UUID
-    email: EmailStr
-    role: UserRole
-    created_at: datetime
-
-
-class ProfileCreate(AppBaseModel):
-    id: UUID
+class ProfileBase(AppBaseModel):
     email: EmailStr
     role: UserRole = 'user'
 
 
-class ProfileUpdate(AppBaseModel):
-    email: Optional[EmailStr] = None
-    role: Optional[UserRole] = None
+class Profile(ProfileBase, UUIDTimestampedModel):
+    pass
 
 
-class ProfileSummary(AppBaseModel):
+class ProfileCreate(ProfileBase):
     id: UUID
-    email: EmailStr
-    role: UserRole
+
+
+class ProfileUpdate(AppBaseModel):
+    email: EmailStr | None = None
+    role: UserRole | None = None
+
+
+class ProfileSummary(ProfileBase, UUIDModel):
+    pass

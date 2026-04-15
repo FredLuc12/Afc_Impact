@@ -1,0 +1,1 @@
+API_METEO = "https://wttr.in/Paris?format=%t"

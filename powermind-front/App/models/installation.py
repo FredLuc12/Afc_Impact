@@ -1,29 +1,26 @@
 # app/models/installation.py
 
-from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
-from app.models.base import AppBaseModel
+from app.models.base import AppBaseModel, UUIDTimestampedModel, UUIDModel
 
 
-class Installation(AppBaseModel):
-    id: UUID
+class InstallationBase(AppBaseModel):
     user_id: UUID
     nom: str
-    created_at: datetime
 
 
-class InstallationCreate(AppBaseModel):
-    user_id: UUID
-    nom: str
+class Installation(InstallationBase, UUIDTimestampedModel):
+    pass
+
+
+class InstallationCreate(InstallationBase):
+    pass
 
 
 class InstallationUpdate(AppBaseModel):
-    nom: Optional[str] = None
+    nom: str | None = None
 
 
-class InstallationSummary(AppBaseModel):
-    id: UUID
-    user_id: UUID
-    nom: str
+class InstallationSummary(InstallationBase, UUIDModel):
+    pass

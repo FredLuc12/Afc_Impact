@@ -10,6 +10,8 @@ from app.constants import (
     ROUTE_CAPTEURS,
     ROUTE_DASHBOARD,
     ROUTE_HOME,
+    ROUTE_DATE_HEURE,
+    ROUTE_VALEURS_BASES,
     ROUTE_INSTALLATIONS,
     ROUTE_LOGIN,
     ROUTE_REGISTER,
@@ -26,6 +28,9 @@ from app.pages.dashboard_page import dashboard_page
 from app.pages.home_page import home_page
 from app.pages.installations_page import installations_page
 from app.pages.login_page import login_page
+from app.pages.consommation_page import consommation_page
+from app.pages.valeurs_bases_page import valeurs_bases_page
+from app.pages.date_heure_page import date_heure_page
 from app.pages.register_page import register_page
 from app.pages.maintenance_page import maintenance_page
 from app.pages.mesures_page import mesures_page
@@ -73,6 +78,11 @@ def register_routes() -> None:
     def dashboard():
         dashboard_page()
 
+    @ui.page(ROUTE_VALEURS_BASES)
+    def valeurs_bases():
+        valeurs_bases_page()
+    
+    
     @ui.page(ROUTE_INSTALLATIONS)
     def installations():
         installations_page()
@@ -80,6 +90,10 @@ def register_routes() -> None:
     @ui.page(ROUTE_CAPTEURS)
     def capteurs():
         capteurs_page()
+        
+    @ui.page(ROUTE_DATE_HEURE)
+    def date_heure_route():
+        date_heure_page()
 
     @ui.page(ROUTE_MESURES)
     def mesures():
@@ -92,6 +106,10 @@ def register_routes() -> None:
     @ui.page(ROUTE_PROFIL)
     def profil():
         profil_page()
+    
+    @ui.page('/consommation')
+    def consommation_route():
+        consommation_page()
 
     @ui.page(ROUTE_REGLAGES)
     def reglages():

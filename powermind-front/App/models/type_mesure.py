@@ -1,32 +1,27 @@
 # app/models/type_mesure.py
 
-from typing import Optional
-from uuid import UUID
-
-from app.models.base import AppBaseModel, MesureKind
+from app.models.base import AppBaseModel, MesureKind, UUIDModel
 
 
-class TypeMesure(AppBaseModel):
-    id: UUID
+class TypeMesureBase(AppBaseModel):
     code: str
     unite: str | None = None
     kind: MesureKind
 
 
-class TypeMesureCreate(AppBaseModel):
-    code: str
-    unite: str | None = None
-    kind: MesureKind
+class TypeMesure(TypeMesureBase, UUIDModel):
+    pass
+
+
+class TypeMesureCreate(TypeMesureBase):
+    pass
 
 
 class TypeMesureUpdate(AppBaseModel):
-    code: Optional[str] = None
-    unite: Optional[str] = None
-    kind: Optional[MesureKind] = None
-
-
-class TypeMesureSummary(AppBaseModel):
-    id: UUID
-    code: str
+    code: str | None = None
     unite: str | None = None
-    kind: MesureKind
+    kind: MesureKind | None = None
+
+
+class TypeMesureSummary(TypeMesureBase, UUIDModel):
+    pass

@@ -1,36 +1,30 @@
 # app/models/mesure.py
-
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
-from app.models.base import AppBaseModel, MesureValueType
+from app.models.base import AppBaseModel, MesureValueType, UUIDTimestampedModel, UUIDModel
 
 
-class Mesure(AppBaseModel):
-    id: UUID
+class MesureBase(AppBaseModel):
     capteur_id: UUID
     type_mesure_id: UUID
     valeur: MesureValueType
-    created_at: datetime
 
 
-class MesureCreate(AppBaseModel):
-    capteur_id: UUID
-    type_mesure_id: UUID
-    valeur: MesureValueType
+class Mesure(MesureBase, UUIDTimestampedModel):
+    pass
+
+
+class MesureCreate(MesureBase):
+    pass
 
 
 class MesureUpdate(AppBaseModel):
-    valeur: Optional[MesureValueType] = None
+    valeur: MesureValueType | None = None
 
 
-class MesureSummary(AppBaseModel):
-    id: UUID
-    capteur_id: UUID
-    type_mesure_id: UUID
-    valeur: MesureValueType
-    created_at: datetime
+class MesureSummary(MesureBase, UUIDTimestampedModel):
+    pass
 
 
 class MesureWithMeta(AppBaseModel):
