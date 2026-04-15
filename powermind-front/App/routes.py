@@ -24,6 +24,7 @@ from app.constants import (
     ROUTE_ROOT,
     ROUTE_VALEURS_BASES,
 )
+from app.core.security import require_auth, require_role
 from app.core.session import SessionManager
 from app.pages.alertes_page import alertes_page
 from app.pages.capteurs_page import capteurs_page
@@ -40,10 +41,11 @@ from app.pages.profil_page import profil_page
 from app.pages.register_page import register_page
 from app.pages.reglages_page import reglages_page
 from app.pages.valeurs_bases_page import valeurs_bases_page
-from app.core.session import SessionManager
+
 
 def is_authenticated() -> bool:
     return bool(app.storage.user.get('authenticated', False))
+
 
 def get_dashboard_route() -> str:
     installation_id = SessionManager.get_installation_id()
@@ -51,19 +53,22 @@ def get_dashboard_route() -> str:
         return f'{ROUTE_DASHBOARD}/{installation_id}'
     return ROUTE_LOGIN
 
+
 def redirect_to_default_page() -> None:
     if is_authenticated():
         ui.navigate.to(get_dashboard_route())
     else:
         ui.navigate.to(ROUTE_LOGIN)
 
+
 def register_routes() -> None:
-    # 1. Racine
+
+    # --- Racine ---
     @ui.page(ROUTE_ROOT)
     def root_page():
         redirect_to_default_page()
 
-    # 2. Auth
+    # --- Auth (publiques) ---
     @ui.page(ROUTE_LOGIN)
     def login():
         if is_authenticated():
@@ -80,78 +85,100 @@ def register_routes() -> None:
         SessionManager.clear()
         ui.navigate.to(ROUTE_LOGIN)
 
-    # 3. Admin
+    # --- Admin (rôle requis) ---
     @ui.page(ROUTE_ADMIN)
     def admin_users():
-        if app.storage.user.get('role') not in ['admin', 'super_admin']:
-            ui.navigate.to(get_dashboard_route())
+        if not require_role('admin', 'super_admin'):
             return
         admin_users_page()
 
-    # 4. App Pages
+    # --- Dashboard ---
     @ui.page(ROUTE_DASHBOARD + '/{installation_id}')
     def dashboard(installation_id: str):
+        if not require_auth():
+            return
         dashboard_page(installation_id)
-    
-    # À ajouter dans register_routes() de app/routes.py
+
     @ui.page(ROUTE_DASHBOARD)
     def dashboard_redirect():
-        # On redirige vers l'ID stocké en session
+        if not require_auth():
+            return
         redirect_to_default_page()
+
+    # --- Pages principales (toutes sécurisées) ---
+    @ui.page(ROUTE_HOME)
+    def home():
+        if not require_auth():
+            return
+        home_page()
+
+    @ui.page(ROUTE_INSTALLATIONS)
+    def installations():
+        if not require_auth():
+            return
+        installations_page()
 
     @ui.page(ROUTE_CAPTEURS + '/{installation_id}')
     def capteurs(installation_id: str):
+        if not require_auth():
+            return
         capteurs_page(installation_id)
+
+    @ui.page(ROUTE_MESURES + '/{installation_id}')
+    def mesures(installation_id: str):
+        if not require_auth():
+            return
+        mesures_page(installation_id)
 
     @ui.page(ROUTE_ALERTES + '/{installation_id}')
     def alertes(installation_id: str):
+        if not require_auth():
+            return
         alertes_page(installation_id)
 
     @ui.page(ROUTE_CONSOMMATION + '/{installation_id}')
     def consommation_route(installation_id: str):
+        if not require_auth():
+            return
         consommation_page(installation_id)
-        
-    @ui.page(ROUTE_DATE_HEURE)
-    def date_heure():
-        date_heure_page()
-    
+
     @ui.page(ROUTE_VALEURS_BASES)
     def valeurs_bases():
+        if not require_auth():
+            return
         valeurs_bases_page()
-    
-    @ui.page(ROUTE_MESURES + '/{installation_id}')
-    def mesures(installation_id: str):
-        mesures_page(installation_id)
-        
+
+    @ui.page(ROUTE_DATE_HEURE)
+    def date_heure():
+        if not require_auth():
+            return
+        date_heure_page()
+
     @ui.page(ROUTE_PROFIL)
     def profil():
+        if not require_auth():
+            return
         profil_page()
-        
+
     @ui.page(ROUTE_REGLAGES)
     def reglages():
+        if not require_role('admin', 'technicien'):
+            return
         reglages_page()
-    
+
     @ui.page(ROUTE_MAINTENANCE)
     def maintenance():
+        if not require_role('admin', 'technicien'):
+            return
         maintenance_page()
-    
-    # 6. Forbiden
+
+    # --- Erreurs ---
     @ui.page(ROUTE_FORBIDEN)
     def forbiden():
-        ui.label('403 - Accès interdit')
+        ui.label('403 — Accès interdit').classes('text-xl font-bold text-red-500 p-8')
         ui.button('Retour', on_click=lambda: ui.navigate.to(get_dashboard_route()))
-
-    # 5. Autres (Simple)
-    @ui.page(ROUTE_HOME)
-    def home(): home_page()
-    
-    @ui.page(ROUTE_INSTALLATIONS)
-    def installations(): installations_page()
-    
-    @ui.page(ROUTE_PROFIL)
-    def profil(): profil_page()
 
     @ui.page(ROUTE_404)
     def not_found():
-        ui.label('404 - Page non trouvée')
+        ui.label('404 — Page non trouvée').classes('text-xl font-bold p-8')
         ui.button('Retour', on_click=lambda: ui.navigate.to('/'))
