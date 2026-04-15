@@ -42,32 +42,39 @@ class AuthService:
         if not email or not password:
             return {'success': False, 'message': 'Identifiants invalides.'}
 
-        # 1. Tentative de connexion
         response = self.supabase.auth.sign_in_with_password({'email': email, 'password': password})
         user = getattr(response, 'user', None)
         session = getattr(response, 'session', None)
 
         if not user:
-            return {'success': False, 'message': 'Connexion impossible.'}
+            return {'success': False, 'message': 'Connexion impossible. Vérifiez vos identifiants.'}
 
         user_id = getattr(user, 'id', None)
         profile = {}
-        installation = None
+        installation = {}
 
         if user_id:
-            if user_id:
-            # Récupération du profil
-                profile_res = self.supabase.table('profiles').select('*').eq('id', user_id).maybe_single().execute()
+            # Récupération du profil (role, full_name…)
+            profile_res = (
+                self.supabase.table('profiles')
+                .select('*')
+                .eq('id', user_id)
+                .maybe_single()
+                .execute()
+            )
+            profile = profile_res.data or {}
 
-                # Récupération de l'installation
-                # On s'assure que le select est bien configuré
-                inst_res = self.supabase.table('installations') \
-                    .select('*') \
-                    .eq('user_id', user_id) \
-                    .order('created_at', desc=True) \
-                    .limit(1) \
-                    .maybe_single() \
-                    .execute()
+            # Récupération de la première installation de l'utilisateur
+            inst_res = (
+                self.supabase.table('installations')
+                .select('*')
+                .eq('user_id', user_id)
+                .order('created_at', desc=True)
+                .limit(1)
+                .maybe_single()
+                .execute()
+            )
+            installation = inst_res.data or {}
 
         return {
             'success': True,
