@@ -1,27 +1,17 @@
 # app/models/choix_auto.py
+# STRUCTURE BDD RÉELLE:
+# choix_auto: id (int8 PK), choix (text) — ATTENTION: colonne 'choix' pas 'mode'/'energie_choisie'
+# Pas de FK installation_id dans cette table
 
-from datetime import datetime
-from uuid import UUID
-
-from app.models.base import AppBaseModel, UUIDTimestampedModel
+from app.models.base import AppBaseModel
 
 
 class ChoixAutoBase(AppBaseModel):
-    installation_id: UUID
-    mode: str
-    energie_choisie: str
-    score_pac: float | None = None
-    score_gaz: float | None = None
-    temperature_interieure: float | None = None
-    temperature_exterieure: float | None = None
-    humidite: float | None = None
-    co2: float | None = None
-    presence: bool | None = None
-    raison: str | None = None
+    choix: str  # ATTENTION: colonne 'choix' en BDD (ex: 'electric', 'gaz')
 
 
-class ChoixAuto(ChoixAutoBase, UUIDTimestampedModel):
-    pass
+class ChoixAuto(ChoixAutoBase):
+    id: int  # int8 en BDD
 
 
 class ChoixAutoCreate(ChoixAutoBase):
@@ -29,21 +19,4 @@ class ChoixAutoCreate(ChoixAutoBase):
 
 
 class ChoixAutoUpdate(AppBaseModel):
-    mode: str | None = None
-    energie_choisie: str | None = None
-    score_pac: float | None = None
-    score_gaz: float | None = None
-    temperature_interieure: float | None = None
-    temperature_exterieure: float | None = None
-    humidite: float | None = None
-    co2: float | None = None
-    presence: bool | None = None
-    raison: str | None = None
-
-
-class ChoixAutoSummary(AppBaseModel):
-    id: UUID
-    installation_id: UUID
-    mode: str
-    energie_choisie: str
-    created_at: datetime
+    choix: str | None = None
