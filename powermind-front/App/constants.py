@@ -14,11 +14,13 @@ DEFAULT_LANGUAGE = 'fr'
 ROLE_ADMIN = 'admin'
 ROLE_TECHNICIEN = 'technicien'
 ROLE_USER = 'user'
+ROLE_SUPER_ADMIN = 'super_admin'
 
 ROLES = [
     ROLE_ADMIN,
     ROLE_TECHNICIEN,
     ROLE_USER,
+    ROLE_SUPER_ADMIN,
 ]
 
 STATUS_OK = 'ok'
@@ -39,8 +41,11 @@ ROUTE_HOME = '/home'
 ROUTE_DATE_HEURE = '/date-heure'
 ROUTE_VALEURS_BASES = '/valeurs-bases'
 ROUTE_DASHBOARD = '/dashboard'
+ROUTE_ADMIN = '/admin/users'
+ROUTE_CONSOMMATION = '/consommation'
 ROUTE_INSTALLATIONS = '/installations'
 ROUTE_CAPTEURS = '/capteurs'
+ROUTE_FORBIDEN = '/forbiden'
 ROUTE_MESURES = '/mesures'
 ROUTE_ALERTES = '/alertes'
 ROUTE_PROFIL = '/profil'
