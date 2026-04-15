@@ -1,4 +1,7 @@
 # app/pages/mesures_page.py
+# CORRECTIONS BDD:
+# - Colonne 'value' (pas 'valeur') sur la table mesures
+# - Jointure 'types_mesure' (pas 'types_mesures')
 
 from nicegui import ui
 
@@ -10,6 +13,7 @@ def mesures_page(installation_id) -> None:
     service = MesureService()
 
     def content() -> None:
+        # list_by_installation retourne des dicts avec jointures capteurs + types_mesure
         mesures = service.list_by_installation(installation_id)
 
         ui.label('Historique des mesures du logement.').classes('text-[#9ca4ae] text-sm -mt-1')
@@ -20,9 +24,11 @@ def mesures_page(installation_id) -> None:
             if mesures:
                 for mesure in mesures[:20]:
                     capteur = mesure.get('capteurs') or {}
-                    type_mesure = mesure.get('types_mesures') or {}
+                    # Jointure 'types_mesure' (sans 's' final — nom réel de la table BDD)
+                    type_mesure = mesure.get('types_mesure') or {}
+                    # Colonne 'value' (pas 'valeur')
                     ui.label(
-                        f"{capteur.get('nom', 'Capteur')} | {type_mesure.get('code', '—')} | {mesure.get('valeur', '—')} {type_mesure.get('unite', '')}"
+                        f"{capteur.get('nom', 'Capteur')} | {type_mesure.get('code', '—')} | {mesure.get('value', '—')} {type_mesure.get('unite', '')}"
                     ).classes('text-sm')
             else:
                 ui.label('Aucune mesure disponible.').classes('text-sm text-gray-500')
