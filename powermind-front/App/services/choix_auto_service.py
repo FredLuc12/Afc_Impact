@@ -1,6 +1,7 @@
 # app/services/choix_auto_service.py
-
-from uuid import UUID
+# STRUCTURE BDD RÉELLE:
+# choix_auto: id (int8 PK), choix (text)
+# PAS de FK installation_id dans cette table
 
 from app.constants import TABLE_CHOIX_AUTO
 from app.models.choix_auto import ChoixAuto, ChoixAutoCreate, ChoixAutoUpdate
@@ -10,11 +11,12 @@ from app.services.base_service import BaseService
 class ChoixAutoService(BaseService):
     table_name = TABLE_CHOIX_AUTO
 
-    def get_by_id(self, choix_auto_id: UUID) -> ChoixAuto | None:
+    def get_by_id(self, choix_auto_id: int) -> ChoixAuto | None:
+        # id est int8 en BDD
         response = (
             self.table()
             .select('*')
-            .eq('id', str(choix_auto_id))
+            .eq('id', choix_auto_id)
             .maybe_single()
             .execute()
         )
@@ -25,31 +27,19 @@ class ChoixAutoService(BaseService):
         response = (
             self.table()
             .select('*')
-            .order('created_at', desc=True)
+            .order('id', desc=True)
             .limit(limit)
             .execute()
         )
         data = self.extract_data(response) or []
         return [ChoixAuto(**item) for item in data]
 
-    def list_by_installation(self, installation_id: UUID, limit: int = 100) -> list[ChoixAuto]:
+    def get_latest(self) -> ChoixAuto | None:
+        """Retourne le dernier choix automatique enregistré."""
         response = (
             self.table()
             .select('*')
-            .eq('installation_id', str(installation_id))
-            .order('created_at', desc=True)
-            .limit(limit)
-            .execute()
-        )
-        data = self.extract_data(response) or []
-        return [ChoixAuto(**item) for item in data]
-
-    def get_latest_by_installation(self, installation_id: UUID) -> ChoixAuto | None:
-        response = (
-            self.table()
-            .select('*')
-            .eq('installation_id', str(installation_id))
-            .order('created_at', desc=True)
+            .order('id', desc=True)
             .limit(1)
             .maybe_single()
             .execute()
@@ -62,15 +52,15 @@ class ChoixAutoService(BaseService):
         data = self.extract_data(response)[0]
         return ChoixAuto(**data)
 
-    def update(self, choix_auto_id: UUID, payload: ChoixAutoUpdate) -> ChoixAuto:
+    def update(self, choix_auto_id: int, payload: ChoixAutoUpdate) -> ChoixAuto:
         response = (
             self.table()
             .update(payload.model_dump(exclude_none=True))
-            .eq('id', str(choix_auto_id))
+            .eq('id', choix_auto_id)
             .execute()
         )
         data = self.extract_data(response)[0]
         return ChoixAuto(**data)
 
-    def delete(self, choix_auto_id: UUID):
-        return self.table().delete().eq('id', str(choix_auto_id)).execute()
+    def delete(self, choix_auto_id: int):
+        return self.table().delete().eq('id', choix_auto_id).execute()
