@@ -4,7 +4,6 @@ from main import ia_energy_chooser
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List
-from supabase import create_client
 
 app = FastAPI()
 supabase = connexion()
