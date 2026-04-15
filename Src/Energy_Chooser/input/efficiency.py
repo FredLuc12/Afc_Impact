@@ -1,6 +1,6 @@
 from input.weather import get_weather
 
-CURRENT_WEATHER = int(get_weather())
+CURRENT_WEATHER = get_weather()
 
 def cop():
     if CURRENT_WEATHER > 10:
