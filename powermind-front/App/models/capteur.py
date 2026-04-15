@@ -1,33 +1,28 @@
 # app/models/capteur.py
 
-from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
-from app.models.base import AppBaseModel
+from app.models.base import AppBaseModel, UUIDTimestampedModel, UUIDModel
 
 
-class Capteur(AppBaseModel):
-    id: UUID
+class CapteurBase(AppBaseModel):
     installation_id: UUID
     type: str
     nom: str
-    created_at: datetime
 
 
-class CapteurCreate(AppBaseModel):
-    installation_id: UUID
-    type: str
-    nom: str
+class Capteur(CapteurBase, UUIDTimestampedModel):
+    pass
+
+
+class CapteurCreate(CapteurBase):
+    pass
 
 
 class CapteurUpdate(AppBaseModel):
-    type: Optional[str] = None
-    nom: Optional[str] = None
+    type: str | None = None
+    nom: str | None = None
 
 
-class CapteurSummary(AppBaseModel):
-    id: UUID
-    installation_id: UUID
-    type: str
-    nom: str
+class CapteurSummary(CapteurBase, UUIDModel):
+    pass

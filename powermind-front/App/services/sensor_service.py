@@ -7,7 +7,7 @@ from app.models.capteur import Capteur, CapteurCreate, CapteurUpdate
 from app.services.base_service import BaseService
 
 
-class CapteurService(BaseService):
+class SensorService(BaseService):
     table_name = TABLE_CAPTEURS
 
     def get_by_id(self, capteur_id: UUID) -> Capteur | None:

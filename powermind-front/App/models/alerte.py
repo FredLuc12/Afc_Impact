@@ -1,25 +1,27 @@
 # app/models/alerte.py
 
-from datetime import datetime
-from typing import Optional
 from uuid import UUID
+from datetime import datetime
 
 from app.models.base import (
     AlerteCriticite,
     AlerteStatut,
     AppBaseModel,
+    UUIDTimestampedModel,
 )
 
 
-class Alerte(AppBaseModel):
-    id: UUID
+class AlerteBase(AppBaseModel):
     installation_id: UUID
     capteur_id: UUID | None = None
     type: str
     criticite: AlerteCriticite
     message: str
     statut: AlerteStatut
-    created_at: datetime
+
+
+class Alerte(AlerteBase, UUIDTimestampedModel):
+    pass
 
 
 class AlerteCreate(AppBaseModel):
@@ -32,10 +34,10 @@ class AlerteCreate(AppBaseModel):
 
 
 class AlerteUpdate(AppBaseModel):
-    type: Optional[str] = None
-    criticite: Optional[AlerteCriticite] = None
-    message: Optional[str] = None
-    statut: Optional[AlerteStatut] = None
+    type: str | None = None
+    criticite: AlerteCriticite | None = None
+    message: str | None = None
+    statut: AlerteStatut | None = None
 
 
 class AlerteSummary(AppBaseModel):
