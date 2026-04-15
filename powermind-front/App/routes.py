@@ -41,6 +41,7 @@ from app.pages.profil_page import profil_page
 from app.pages.register_page import register_page
 from app.pages.reglages_page import reglages_page
 from app.pages.valeurs_bases_page import valeurs_bases_page
+from app.pages.forgot_password_page import forgot_password_page
 
 
 def is_authenticated() -> bool:
@@ -171,6 +172,47 @@ def register_routes() -> None:
         if not require_role('admin', 'technicien'):
             return
         maintenance_page()
+
+    @ui.page('/forgot-password')
+    def forgot_password():
+        forgot_password_page()
+
+    @ui.page('/reset-password')
+    def reset_password():
+        # Page intermédiaire : Supabase redirige ici après clic sur le lien email.
+        # Le token est dans l'URL (#access_token=...), géré côté JS par Supabase.
+        from nicegui import ui
+        from app.layouts.auth_layout import auth_layout
+
+        def content():
+            ui.label('Nouveau mot de passe').classes('pm-auth-title')
+            ui.label('Saisissez votre nouveau mot de passe.').classes('text-sm text-gray-400 mb-4')
+
+            new_pw  = ui.input('Nouveau mot de passe', password=True, password_toggle_button=True).classes('w-full')
+            conf_pw = ui.input('Confirmer',            password=True, password_toggle_button=True).classes('w-full')
+
+            def do_reset():
+                p1 = (new_pw.value  or '').strip()
+                p2 = (conf_pw.value or '').strip()
+                if not p1 or p1 != p2:
+                    ui.notify('Les mots de passe ne correspondent pas.', type='negative')
+                    return
+                if len(p1) < 8:
+                    ui.notify('Minimum 8 caractères.', type='negative')
+                    return
+                try:
+                    from app.core.supabase_client import get_supabase_client
+                    supabase = get_supabase_client()
+                    supabase.auth.update_user({'password': p1})
+                    ui.notify('Mot de passe mis à jour ! Redirection…', type='positive')
+                    ui.timer(1.5, lambda: ui.navigate.to('/login'), once=True)
+                except Exception as e:
+                    ui.notify(f'Erreur : {str(e)}', type='negative')
+
+            ui.element('div').style('height: 12px')
+            ui.button('Confirmer le nouveau mot de passe', on_click=do_reset).props('color=positive').classes('w-full')
+
+        auth_layout(content)
 
     # --- Erreurs ---
     @ui.page(ROUTE_FORBIDEN)
