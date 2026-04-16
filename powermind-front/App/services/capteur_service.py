@@ -1,8 +1,9 @@
 # app/services/sensor_service.py
 
 from uuid import UUID
+from typing import Any
 
-from app.constants import TABLE_CAPTEURS
+from app.constants import TABLE_CAPTEURS, TABLE_INSTALLATIONS
 from app.models.capteur import Capteur, CapteurCreate, CapteurUpdate
 from app.services.base_service import BaseService
 
@@ -59,3 +60,33 @@ class CapteurService(BaseService):
 
     def delete(self, capteur_id: UUID):
         return self.table().delete().eq('id', str(capteur_id)).execute()
+
+    # --- AJOUTS POUR L'INTERFACE ADMIN (EF14) ---
+
+    def list_all_with_details(self) -> list[dict[str, Any]]:
+        """Récupère tous les capteurs avec le nom de l'installation (via self.table())"""
+        response = (
+            self.table()
+            .select('*, installations(id, nom)')
+            .order('created_at', desc=True)
+            .execute()
+        )
+        return self.extract_data(response) or []
+
+    def get_installations_lookup(self) -> list[dict[str, Any]]:
+        """Récupère la liste des installations via self.client"""
+        response = (
+            self.client.table(TABLE_INSTALLATIONS)
+            .select('id, nom')
+            .order('nom')
+            .execute()
+        )
+        return self.extract_data(response) or []
+
+    def toggle_activation(self, capteur_id: UUID, is_active: bool) -> bool:
+        """Active ou désactive un capteur via self.table()"""
+        try:
+            self.table().update({'is_active': is_active}).eq('id', str(capteur_id)).execute()
+            return True
+        except Exception:
+            return False
