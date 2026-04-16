@@ -24,6 +24,8 @@ from app.constants import (
     ROUTE_ROOT,
     ROUTE_VALEURS_BASES,
     ROUTE_WAITING,
+    ROUTE_PROGRAMMATION,
+    ROUTE_ADMIN_CAPTEURS,
 )
 from app.core.security import require_auth, require_role
 from app.core.session import SessionManager
@@ -44,6 +46,8 @@ from app.pages.reglages_page import reglages_page
 from app.pages.valeurs_bases_page import valeurs_bases_page
 from app.pages.forgot_password_page import forgot_password_page
 from app.pages.waiting_page import waiting_activation_page
+from app.pages.programmation_page import programmation_page
+from app.pages.admin.admin_capteurs_page import admin_capteurs_page
 
 
 def is_authenticated() -> bool:
@@ -248,3 +252,16 @@ def register_routes() -> None:
     @ui.page(ROUTE_WAITING)
     def waiting_room():
         waiting_activation_page()
+        
+    @ui.page(ROUTE_PROGRAMMATION)
+    def programmation():
+        if not require_auth():
+            return
+        programmation_page()
+        
+    @ui.page(ROUTE_ADMIN_CAPTEURS)
+    def admin_capteurs():
+        if not require_role('admin', 'super_admin'):
+            return
+        from app.pages.admin.admin_capteurs_page import admin_capteurs_page
+        admin_capteurs_page()

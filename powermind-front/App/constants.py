@@ -54,6 +54,8 @@ ROUTE_REGLAGES = '/reglages'
 ROUTE_MAINTENANCE = '/maintenance'
 ROUTE_404 = '/404'
 ROUTE_WAITING = '/waiting'
+ROUTE_PROGRAMMATION = '/programmation'
+ROUTE_ADMIN_CAPTEURS = '/admin/capteurs'
 
 PUBLIC_ROUTES = {
     ROUTE_ROOT,
@@ -72,6 +74,8 @@ NAV_ITEMS = [
     {'label': 'Profil', 'icon': 'person', 'path': ROUTE_PROFIL, 'roles': ROLES},
     {'label': 'Réglages', 'icon': 'settings', 'path': ROUTE_REGLAGES, 'roles': [ROLE_ADMIN, ROLE_TECHNICIEN]},
     {'label': 'Maintenance', 'icon': 'build', 'path': ROUTE_MAINTENANCE, 'roles': [ROLE_ADMIN, ROLE_TECHNICIEN]},
+    {'label': 'Programmation', 'icon': 'event', 'path': ROUTE_PROGRAMMATION, 'roles': ROLES},
+    {'label': 'AdminCapteurs', 'icon': 'sensors', 'path': ROUTE_ADMIN_CAPTEURS, 'roles': [ROLE_ADMIN, ROLE_SUPER_ADMIN]},
 ]
 
 DEFAULT_REDIRECT_IF_AUTHENTICATED = ROUTE_DASHBOARD
@@ -84,3 +88,4 @@ TABLE_TYPES_MESURES = 'types_mesure'
 TABLE_MESURES = 'mesures'
 TABLE_ALERTES = 'alertes'
 TABLE_CHOIX_AUTO = 'choix_auto'
+TABLE_PROGRAMMATIONS = 'programmations'
