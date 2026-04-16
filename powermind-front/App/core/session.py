@@ -61,3 +61,7 @@ class SessionManager:
     @staticmethod
     def get_all() -> dict[str, Any]:
         return dict(app.storage.user)
+
+    @staticmethod
+    def is_admin() -> bool:
+        return app.storage.user.get('role') in ['admin', 'super_admin']

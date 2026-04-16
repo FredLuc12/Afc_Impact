@@ -79,23 +79,38 @@ def get_default_redirect_path() -> str:
         return f'{ROUTE_DASHBOARD}/{installation_id}'
     return ROUTE_LOGIN
 
+# @app.add_middleware
+# class AuthMiddleware(BaseHTTPMiddleware):
+#     async def dispatch(self, request: Request, call_next):
+#         path = request.url.path
+
+#         # DEBUG
+#         print(f"Middleware inspecte : {path} | Public: {is_public_path(path)} | Auth: {SessionManager.is_authenticated()}")
+
+#         # RÈGLE 1 : Si c'est un chemin public ou interne, on laisse passer sans condition
+#         if is_public_path(path):
+#             return await call_next(request)
+
+#         # RÈGLE 2 : Si l'utilisateur n'est pas connecté
+#         if not SessionManager.is_authenticated():
+#             # Si on essaie d'aller à la racine ou ailleurs, on force vers LOGIN
+#             if path != ROUTE_LOGIN:
+#                 return RedirectResponse(f'{ROUTE_LOGIN}?redirect_to={path}')
+
+#         # RÈGLE 3 : Si on arrive ici, soit on est connecté, soit on est sur le login
+#         return await call_next(request)
 @app.add_middleware
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-
-        # DEBUG : Décommente la ligne suivante pour voir les chemins bloqués dans ton terminal
-        print(f"Middleware inspecte : {path} | Public: {is_public_path(path)} | Auth: {SessionManager.is_authenticated()}")
-
-        # RÈGLE 1 : Si c'est un chemin public ou interne, on laisse passer sans condition
+        
+        # 1. On laisse TOUJOURS passer les routes publiques et NiceGUI
         if is_public_path(path):
             return await call_next(request)
 
-        # RÈGLE 2 : Si l'utilisateur n'est pas connecté
+        # 2. Si l'utilisateur n'est pas connecté, on l'envoie au login
         if not SessionManager.is_authenticated():
-            # Si on essaie d'aller à la racine ou ailleurs, on force vers LOGIN
-            if path != ROUTE_LOGIN:
-                return RedirectResponse(f'{ROUTE_LOGIN}?redirect_to={path}')
+            return RedirectResponse(f'{ROUTE_LOGIN}?redirect_to={path}')
 
-        # RÈGLE 3 : Si on arrive ici, soit on est connecté, soit on est sur le login
+        # 3. S'il est connecté, on ne fait RIEN (on laisse la page s'afficher)
         return await call_next(request)

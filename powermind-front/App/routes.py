@@ -23,6 +23,7 @@ from app.constants import (
     ROUTE_REGISTER,
     ROUTE_ROOT,
     ROUTE_VALEURS_BASES,
+    ROUTE_WAITING,
 )
 from app.core.security import require_auth, require_role
 from app.core.session import SessionManager
@@ -42,25 +43,44 @@ from app.pages.register_page import register_page
 from app.pages.reglages_page import reglages_page
 from app.pages.valeurs_bases_page import valeurs_bases_page
 from app.pages.forgot_password_page import forgot_password_page
+from app.pages.waiting_page import waiting_activation_page
 
 
 def is_authenticated() -> bool:
     return bool(app.storage.user.get('authenticated', False))
 
 
+# def get_dashboard_route() -> str:
+#     installation_id = SessionManager.get_installation_id()
+#     if installation_id:
+#         return f'{ROUTE_DASHBOARD}/{installation_id}'
+#     return ROUTE_LOGIN
 def get_dashboard_route() -> str:
+    # On récupère le rôle et l'ID d'installation
+    role = SessionManager.get_role()
     installation_id = SessionManager.get_installation_id()
+    
+    if role in ['admin', 'super_admin']:
+        return ROUTE_ADMIN
+    
     if installation_id:
         return f'{ROUTE_DASHBOARD}/{installation_id}'
-    return ROUTE_LOGIN
+    
+    # Si c'est un utilisateur sans installation, on l'envoie vers la page d'attente
+    return ROUTE_WAITING
 
-
+# def redirect_to_default_page() -> None:
+#     if is_authenticated():
+#         ui.navigate.to(get_dashboard_route())
+#     else:
+#         ui.navigate.to(ROUTE_LOGIN)
 def redirect_to_default_page() -> None:
     if is_authenticated():
-        ui.navigate.to(get_dashboard_route())
+        target = get_dashboard_route()
+        # Sécurité : si on est déjà sur la cible, on ne navigue pas pour éviter la boucle
+        ui.navigate.to(target)
     else:
         ui.navigate.to(ROUTE_LOGIN)
-
 
 def register_routes() -> None:
 
@@ -224,3 +244,7 @@ def register_routes() -> None:
     def not_found():
         ui.label('404 — Page non trouvée').classes('text-xl font-bold p-8')
         ui.button('Retour', on_click=lambda: ui.navigate.to('/'))
+
+    @ui.page(ROUTE_WAITING)
+    def waiting_room():
+        waiting_activation_page()

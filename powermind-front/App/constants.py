@@ -53,6 +53,7 @@ ROUTE_PROFIL = '/profil'
 ROUTE_REGLAGES = '/reglages'
 ROUTE_MAINTENANCE = '/maintenance'
 ROUTE_404 = '/404'
+ROUTE_WAITING = '/waiting'
 
 PUBLIC_ROUTES = {
     ROUTE_ROOT,
