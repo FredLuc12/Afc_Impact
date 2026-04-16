@@ -5,12 +5,27 @@
 
 SensirionI2cScd4x scd4x;
 
+const char* ssid = "IPhone de Alyssa";
+const char* password = "azerty123";
+const char* mqtt_server = "172.20.10.2"; // IP du Raspberry
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
 void setup() {
   Serial.begin(115200);
   while (!Serial) {
     delay(10);
   }
 
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("WiFi connecté");
+  client.setServer(mqtt_server, 1883);
   // ESP8266: ajuster si besoin
   Wire.begin(D2, D1);           // SDA, SCL (NodeMCU : D2=GPIO4, D1=GPIO5)
 
@@ -44,6 +59,16 @@ void setup() {
   delay(5000);
 }
 
+void reconnect() {
+  while (!client.connected()) {
+    if (client.connect("ESP8266_CO2")) {
+      Serial.println("MQTT connecté");
+    } else {
+      delay(2000);
+    }
+  }
+}
+
 void loop() {
   int16_t err;
   bool dataReady = false;
@@ -62,6 +87,23 @@ void loop() {
     return;
   }
 
+  if (!client.connected()) {
+    reconnect();
+  }
+
+  client.loop();
+
+  String sensor_id = WiFi.macAddress();
+  String payload = "{\"temperature\":25.5}";
+
+  if (client.publish("capteurs/temp", sensor_id)) {
+    Serial.println("Message envoyé");
+  } else {
+    Serial.println("Echec envoi");
+  }
+
+  delay(5000);
+
   uint16_t co2;
   float temperature;
   float humidity;
@@ -76,7 +118,11 @@ void loop() {
     } else {
       Serial.print("CO2: ");
       Serial.print(co2);
-      Serial.print(" ppm, Temp: ");
+      Serial.print("Temp: ");
+      Serial.print(temperature);
+      Serial.print("humidity: ");
+      Serial.print(humidity);
+
     }
   }
 
