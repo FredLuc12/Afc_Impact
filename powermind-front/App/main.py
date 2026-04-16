@@ -16,8 +16,8 @@ def startup() -> None:
 
 if __name__ in {'__main__', '__mp_main__'}:
     # On enregistre les routes ICI, juste avant de lancer le serveur
-    startup() 
-    
+    startup()
+
     ui.run(
         host=settings.host,
         port=settings.port,

@@ -1,11 +1,57 @@
+# app/pages/home_page.py
+# CORRECTIONS BDD:
+# - choix_auto: colonne 'choix' (pas '.mode'), pas de FK installation_id
+# - mesures: colonne 'value' (pas 'valeur'), jointure 'types_mesure' (pas 'types_mesures')
+
+from datetime import datetime
+from uuid import UUID
 from nicegui import ui
 
 from app.layouts.app_layout import app_layout
 from app.components.action_button import render_action_button
+from app.core.session import SessionManager
+from app.services.mesure_service import MesureService
+from app.services.choix_auto_service import ChoixAutoService
+from app.constants import ROUTE_LOGIN, ROUTE_DASHBOARD, ROUTE_VALEURS_BASES
 
 
 def home_page() -> None:
+    mesure_service = MesureService()
+    choix_service = ChoixAutoService()
+
+    inst_id_str = SessionManager.get_installation_id()
+    inst_id = UUID(inst_id_str) if inst_id_str else None
+
     def content() -> None:
+        def handle_navigation(target):
+            if not SessionManager.is_authenticated():
+                ui.navigate.to(ROUTE_LOGIN)
+                return
+            if target == 'chauffage':
+                path = f"{ROUTE_DASHBOARD}/{inst_id}" if inst_id else ROUTE_DASHBOARD
+                ui.navigate.to(path)
+            else:
+                ui.navigate.to(ROUTE_VALEURS_BASES)
+
+        # Dernier choix auto global (pas de FK installation_id dans choix_auto)
+        latest_choix = choix_service.get_latest()
+        # Colonne 'choix' (pas '.mode') — valeurs: 'electric', 'gaz'
+        mode_text = latest_choix.choix.upper() if latest_choix else "MANUEL"
+
+        temp_int = "N/A"
+        temp_ext = "N/A"
+        if inst_id:
+            recent = mesure_service.list_by_installation(inst_id, limit=10)
+            for m in recent:
+                # Jointure 'types_mesure' (sans 's' — nom réel BDD)
+                tm = m.get('types_mesure') or {}
+                code = tm.get('code')
+                # Colonne 'value' (pas 'valeur')
+                if code == 'TEMP_INT':
+                    temp_int = f"{m.get('value', '?')}°C"
+                if code == 'TEMP_EXT':
+                    temp_ext = f"{m.get('value', '?')}°C"
+
         ui.add_head_html('''
         <style>
             .pm-landing-wrap {
@@ -15,9 +61,7 @@ def home_page() -> None:
                 justify-content: space-between;
                 text-align: center;
             }
-            .pm-brand-zone {
-                margin-top: 34px;
-            }
+            .pm-brand-zone { margin-top: 34px; }
             .pm-brand-mark {
                 font-size: 1.8rem;
                 font-weight: 800;
@@ -75,14 +119,25 @@ def home_page() -> None:
 
             with ui.element('div').classes('pm-landing-meta'):
                 with ui.column().classes('gap-0'):
-                    ui.label('Date/Heure')
-                    ui.label('Mode: AUTO').classes('pm-landing-mode')
-                ui.label('Température intérieur')
-                ui.label('Température extérieur')
+                    ui.label(datetime.now().strftime('%d/%m/%Y'))
+                    ui.label(datetime.now().strftime('%H:%M')).style('font-weight: 700')
+                    ui.label(f'Mode: {mode_text}').classes('pm-landing-mode')
+
+                with ui.column().classes('gap-0'):
+                    ui.label('Temp. intérieur')
+                    ui.label(temp_int).style('font-weight: 700; font-size: 1rem')
+
+                with ui.column().classes('gap-0'):
+                    ui.label('Temp. extérieur')
+                    ui.label(temp_ext).style('font-weight: 700; font-size: 1rem')
 
             with ui.element('div').classes('pm-landing-actions'):
-                render_action_button('Accéder au chauffage', on_click=lambda: ui.navigate.to('/dashboard'), color='green')
-                render_action_button('Accéder aux paramètres', on_click=lambda: ui.navigate.to('/login'), color='coral')
+                render_action_button('Accéder au chauffage',
+                                     on_click=lambda: handle_navigation('chauffage'),
+                                     color='green')
+                render_action_button('Accéder aux paramètres',
+                                     on_click=lambda: handle_navigation('parametres'),
+                                     color='coral')
 
             ui.label('Impact environnemental').classes('pm-landing-footer')
             ui.icon('power_settings_new').classes('pm-power-icon')

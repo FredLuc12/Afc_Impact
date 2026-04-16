@@ -1,145 +1,98 @@
-from nicegui import ui
+# app/pages/valeurs_bases_page.py
+# CORRECTIONS BDD:
+# - choix_auto: colonne 'choix' (pas 'mode') + pas de FK installation_id
+# - mesures: colonne 'value' (pas 'valeur') + jointure 'types_mesure' (pas 'types_mesures')
+# - alertes: seulement 'message' (pas 'titre', 'niveau')
+# - ChoixAutoCreate: seulement champ 'choix' (pas installation_id/mode)
 
+from nicegui import ui
+from uuid import UUID
 from app.layouts.dashboard_layout import dashboard_layout
 from app.components.alert_badge import render_alert_badge
 from app.components.sensor_card import render_sensor_card
+from app.core.session import SessionManager
+from app.services.mesure_service import MesureService
+from app.services.alerte_service import AlerteService
+from app.services.choix_auto_service import ChoixAutoService
+from app.models.choix_auto import ChoixAutoCreate
 
 
 def valeurs_bases_page() -> None:
+    mesure_service = MesureService()
+    alerte_service = AlerteService()
+    choix_service = ChoixAutoService()
+
+    inst_id_str = SessionManager.get_installation_id()
+    inst_id = UUID(inst_id_str) if inst_id_str else None
+
     def content() -> None:
-        ui.add_head_html('''
-        <style>
-            .vb-title {
-                color: #3f4854;
-                font-size: 24px;
-                font-weight: 700;
-                margin-bottom: 6px;
-            }
-            .vb-subtitle {
-                color: #9aa3ad;
-                font-size: 13px;
-                margin-bottom: 18px;
-            }
-            .vb-section-title {
-                color: #3f4854;
-                font-size: 16px;
-                font-weight: 700;
-                margin-top: 12px;
-                margin-bottom: 10px;
-            }
-            .vb-panel {
-                background: #ffffff;
-                border-radius: 18px;
-                padding: 16px;
-                box-shadow: 0 10px 24px rgba(31, 41, 55, 0.06);
-                border: 1px solid #eef1f4;
-            }
-            .vb-kpi-card {
-                background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
-                border-radius: 16px;
-                padding: 14px;
-                border: 1px solid #edf1f5;
-                min-height: 88px;
-            }
-            .vb-kpi-label {
-                color: #9ca4ae;
-                font-size: 12px;
-                margin-bottom: 8px;
-            }
-            .vb-kpi-value {
-                color: #3f4854;
-                font-size: 22px;
-                font-weight: 700;
-                line-height: 1.1;
-            }
-            .vb-kpi-note {
-                color: #7dc86e;
-                font-size: 12px;
-                font-weight: 600;
-                margin-top: 6px;
-            }
-            .vb-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                gap: 12px;
-                padding: 10px 0;
-                border-bottom: 1px solid #f0f2f5;
-            }
-            .vb-row:last-child {
-                border-bottom: none;
-            }
-            .vb-row-label {
-                color: #6b7280;
-                font-size: 14px;
-                font-weight: 500;
-            }
-            .vb-row-value {
-                color: #3f4854;
-                font-size: 14px;
-                font-weight: 700;
-            }
-        </style>
-        ''')
+        if not inst_id:
+            ui.label("Erreur : Aucune installation détectée.").classes('text-red-500 p-4')
+            return
 
-        ui.label('Valeurs de base').classes('vb-title')
-        ui.label("Consignes, seuils et références du système PowerMind.").classes('vb-subtitle')
+        # 1. Dernier choix auto global (pas de FK installation_id en BDD)
+        latest_choix = choix_service.get_latest()
+        # Colonne réelle BDD: 'choix' (ex: 'electric', 'gaz')
+        current_mode = latest_choix.choix if latest_choix else "manuel"
 
-        ui.label('État général').classes('vb-section-title')
-        with ui.row().classes('w-full').style('gap: 10px; flex-wrap: wrap;'):
-            with ui.card().classes('vb-kpi-card').style('flex: 1; min-width: 150px;'):
-                ui.label('Mode actif').classes('vb-kpi-label')
-                ui.label('Automatique').classes('vb-kpi-value')
-                ui.label('Priorité PAC').classes('vb-kpi-note')
+        # 2. Mesures récentes via jointure capteurs (pas de installation_id direct)
+        # list_by_installation retourne des dicts avec jointures
+        recent_mesures = mesure_service.list_by_installation(inst_id, limit=20)
 
-            with ui.card().classes('vb-kpi-card').style('flex: 1; min-width: 150px;'):
-                ui.label('Température cible').classes('vb-kpi-label')
-                ui.label('21°C').classes('vb-kpi-value')
-                ui.label('Confort standard').classes('vb-kpi-note')
+        # 3. Alertes via jointure capteurs
+        alertes = alerte_service.list_by_installation(inst_id)
 
-        with ui.row().classes('w-full items-center').style('gap: 8px; margin-top: 14px; margin-bottom: 10px; flex-wrap: wrap;'):
-            render_alert_badge('Capteurs synchronisés', 'success')
-            render_alert_badge('CO₂ à surveiller', 'warning')
-            render_alert_badge('Gaz en secours', 'info')
+        async def toggle_mode(e):
+            new_choix = "electric" if e.value else "gaz"
+            try:
+                # ChoixAutoCreate: seulement champ 'choix' en BDD
+                choix_service.create(ChoixAutoCreate(choix=new_choix))
+                ui.notify(f"Mode '{new_choix}' enregistré avec succès.", type='positive')
+            except Exception as ex:
+                ui.notify(f"Erreur lors de l'enregistrement : {str(ex)}", type='negative')
 
-        ui.label('Consignes système').classes('vb-section-title')
-        with ui.card().classes('vb-panel w-full'):
-            rows = [
-                ('Température économique', '18°C'),
-                ('Température absence', '16°C'),
-                ('Humidité confort', '40% - 60%'),
-                ('Seuil CO₂ alerte', '1000 ppm'),
-                ('Délai détection présence', '< 3 s'),
-                ('Bascule chaudière gaz', 'Activée'),
-                ('Source prioritaire', 'PAC'),
-                ('Dernière synchronisation', 'Aujourd’hui à 14:20'),
-            ]
-            for label, value in rows:
-                with ui.row().classes('vb-row w-full'):
-                    ui.label(label).classes('vb-row-label')
-                    ui.label(value).classes('vb-row-value')
+        ui.label('Valeurs de base').classes('text-xl font-bold')
+        ui.label("Consignes, seuils et références du système PowerMind.").classes('text-sm text-gray-500 -mt-1')
 
-        ui.label('Capteurs de référence').classes('vb-section-title')
-        with ui.row().classes('w-full').style('gap: 12px; flex-wrap: wrap;'):
+        # --- MODE ---
+        ui.label('Configuration du mode').classes('text-base font-semibold mt-4')
+        with ui.card().classes('w-full p-4'):
+            with ui.row().classes('items-center justify-between w-full'):
+                with ui.column():
+                    ui.label('Mode de pilotage').classes('text-xs text-gray-500')
+                    # Affiche la valeur réelle de la colonne 'choix'
+                    ui.label(current_mode.upper()).classes('text-lg font-bold')
+                ui.switch(
+                    'Mode Électrique',
+                    value=(current_mode == "electric"),
+                    on_change=toggle_mode
+                ).props('color=coral')
+
+        # --- CAPTEURS DE RÉFÉRENCE ---
+        ui.label('Capteurs de référence').classes('text-base font-semibold mt-4')
+        with ui.row().classes('w-full gap-3 flex-wrap'):
+
+            def get_val(code: str) -> str:
+                """Extrait la dernière valeur pour un code de type_mesure donné."""
+                for m in recent_mesures:
+                    # Jointure 'types_mesure' (sans 's' — nom réel de la table)
+                    tm = m.get('types_mesure') or {}
+                    if tm.get('code') == code:
+                        # Colonne 'value' (pas 'valeur')
+                        return f"{m.get('value', 'N/A')}{tm.get('unite', '')}"
+                return "N/A"
+
             render_sensor_card(
                 title='Température intérieure',
-                value='21.4°C',
-                unit='Stable',
+                value=get_val('TEMP_INT'),
+                unit='Référence BDD',
                 status='online',
                 icon='device_thermostat',
                 color='green',
             )
             render_sensor_card(
-                title='Température extérieure',
-                value='12.8°C',
-                unit='Météo locale',
-                status='online',
-                icon='wb_sunny',
-                color='blue',
-            )
-            render_sensor_card(
                 title='Humidité',
-                value='48%',
+                value=get_val('HUM'),
                 unit='Zone confort',
                 status='online',
                 icon='water_drop',
@@ -147,44 +100,35 @@ def valeurs_bases_page() -> None:
             )
             render_sensor_card(
                 title='CO₂',
-                value='920 ppm',
-                unit='À surveiller',
-                status='warning',
+                value=get_val('CO2'),
+                unit='Dernière lecture',
+                status='warning' if 'N/A' not in get_val('CO2') else 'online',
                 icon='co2',
                 color='orange',
             )
-            render_sensor_card(
-                title='Présence',
-                value='Occupé',
-                unit='Détection active',
-                status='online',
-                icon='motion_photos_on',
-                color='purple',
-            )
-            render_sensor_card(
-                title='Chaudière gaz',
-                value='Secours prêt',
-                unit='Standby',
-                status='idle',
-                icon='local_fire_department',
-                color='red',
-            )
 
-        ui.label('Alertes et seuils').classes('vb-section-title')
-        with ui.card().classes('vb-panel w-full'):
-            with ui.row().classes('w-full items-center justify-between').style('margin-bottom: 10px;'):
-                ui.label('État des alarmes').style('color:#3f4854;font-size:15px;font-weight:700;')
-                render_alert_badge('1 alerte mineure', 'warning')
+        # --- ALERTES ---
+        ui.label('Alertes et seuils').classes('text-base font-semibold mt-4')
+        with ui.card().classes('w-full p-4'):
+            with ui.row().classes('w-full items-center justify-between mb-2'):
+                ui.label('Journal des anomalies').classes('font-bold text-slate-700')
+                render_alert_badge(
+                    f'{len(alertes)} alerte(s)' if alertes else 'Système sain',
+                    'danger' if alertes else 'success'
+                )
 
-            rows = [
-                ('CO₂ supérieur au niveau cible', 'Prévoir aération ou réduction occupation'),
-                ('Aucune anomalie humidité', 'Valeur dans la plage recommandée'),
-                ('Chaudière disponible en secours', 'Activation si rendement PAC insuffisant'),
-            ]
-            for title, desc in rows:
-                with ui.column().classes('w-full').style('padding: 10px 0; border-bottom: 1px solid #f0f2f5;'):
-                    ui.label(title).style('color:#3f4854;font-size:14px;font-weight:600;')
-                    ui.label(desc).style('color:#97a0aa;font-size:12px;')
+            if not alertes:
+                ui.label("Aucune alerte en cours.").classes('text-gray-400 text-sm py-4 text-center')
+            else:
+                for alerte in alertes[:5]:
+                    with ui.column().classes('w-full py-2 border-b border-gray-100'):
+                        with ui.row().classes('w-full justify-between'):
+                            capteur_info = alerte.get('capteurs') or {}
+                            ui.label(capteur_info.get('nom', 'Capteur inconnu')).classes('text-sm font-semibold text-slate-700')
+                            ui.label(str(alerte.get('created_at', '—'))).classes('text-[10px] text-gray-400')
+                        # Seul champ texte disponible: 'message'
+                        ui.label(alerte.get('message', '—')).classes('text-xs text-gray-500')
+
     dashboard_layout(
         title='Valeurs de base',
         content=content,

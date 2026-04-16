@@ -1,162 +1,160 @@
+# app/pages/consommation_page.py
+# Graphique historique des mesures sur 7 jours par type de capteur
+# IDs BDD : 1=CO2, 2=Humidité, 3=Température, 4=Présence
+
+from __future__ import annotations
+from uuid import UUID
+from datetime import datetime
+
 from nicegui import ui
 
+from app.core.notifications import notify_warning
+from app.core.security import require_same_installation
+from app.core.session import SessionManager
+from app.core.utils import parse_uuid
+from app.layouts.dashboard_layout import dashboard_layout
+from app.services.mesure_service import MesureService
+from app.services.choix_auto_service import ChoixAutoService
 
-def consommation_page() -> None:
-    ui.add_head_html('''
-    <style>
-        .pm-screen {
-            background: #f5f5f5;
-            min-height: 100vh;
-            padding: 20px 18px 28px 18px;
-            font-family: Inter, Arial, sans-serif;
-        }
-        .pm-back {
-            color: #ec6b73;
-            font-size: 24px;
-            font-weight: 500;
-            line-height: 1;
-            text-decoration: none;
-        }
-        .pm-title {
-            color: #3e4852;
-            font-size: 21px;
-            font-weight: 700;
-            margin-top: 18px;
-            margin-bottom: 24px;
-        }
-        .pm-ring-label {
-            color: #b0b5bc;
-            font-size: 12px;
-        }
-        .pm-ring-wrap {
-            width: 96px;
-            height: 96px;
-            border-radius: 999px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: conic-gradient(var(--ring-color) calc(var(--value) * 1%), #e8e8e8 0);
-            position: relative;
-        }
-        .pm-ring-wrap::after {
-            content: '';
-            position: absolute;
-            inset: 6px;
-            border-radius: 999px;
-            background: #f5f5f5;
-        }
-        .pm-ring-value {
-            position: relative;
-            z-index: 1;
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--ring-color);
-        }
-        .pm-chart-card {
-            background: #efefef;
-            border-radius: 14px;
-            padding: 16px 14px 14px 14px;
-            margin-top: 10px;
-        }
-        .pm-bars {
-            height: 92px;
-            display: flex;
-            align-items: end;
-            gap: 9px;
-        }
-        .pm-bar {
-            width: 8px;
-            border-radius: 3px 3px 0 0;
-            background: #8f9397;
-        }
-        .pm-bar.soft { background: #bebebe; }
-        .pm-bar.red { background: #ee6f79; }
-        .pm-bar.red-soft { background: #f49da4; }
-        .pm-avatar {
-            width: 28px;
-            height: 28px;
-            border-radius: 999px;
-            object-fit: cover;
-            background: #ddd;
-        }
-        .pm-market-name {
-            color: #5d636a;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        .pm-market-price {
-            color: #9b9fa5;
-            font-size: 13px;
-            font-weight: 600;
-        }
-    </style>
-    ''')
+# Mapping type_mesure_id → label affichage
+TYPES = {
+    3: {'label': 'Température', 'unite': '°C',  'color': '#ef6670', 'icon': 'device_thermostat'},
+    2: {'label': 'Humidité',    'unite': '%',   'color': '#5c67ec', 'icon': 'water_drop'},
+    1: {'label': 'CO₂',        'unite': 'ppm', 'color': '#f59e0b', 'icon': 'co2'},
+}
 
-    with ui.column().classes('pm-screen w-full').style('max-width: 390px; margin: 0 auto;'):
-        ui.link('←', '/home').classes('pm-back')
-        ui.label('Consommation').classes('pm-title')
 
-        with ui.row().classes('w-full justify-between items-start').style(
-            'margin-top: 6px; border-top: 1px solid #e7e7e7; padding-top: 16px;'
-        ):
-            for label, value, color in [
-                ('Consommation en cours', 64, '#72d7a0'),
-                ('Consommation hier', 90, '#5f6ae9'),
-            ]:
-                with ui.column().classes('items-center').style('width: 46%; gap: 10px;'):
-                    ui.label(label).classes('pm-ring-label')
-                    with ui.element('div').classes('pm-ring-wrap').style(
-                        f'--value:{value}; --ring-color:{color};'
-                    ):
-                        ui.label(f'{value}%').classes('pm-ring-value')
+def _fmt_heure(iso: str) -> str:
+    """Formate un timestamp ISO en heure lisible."""
+    try:
+        dt = datetime.fromisoformat(iso.replace('Z', '+00:00'))
+        return dt.strftime('%d/%m %H:%M')
+    except Exception:
+        return iso[:10]
 
-        with ui.column().classes('w-full').style('margin-top: 12px;'):
-            with ui.row().classes('w-full items-end justify-between').style(
-                'border-top: 1px solid #e7e7e7; padding-top: 12px;'
-            ):
-                ui.element('div')
-                with ui.column().classes('items-end').style('gap: 6px;'):
-                    ui.label('Optimisations des prospects').style(
-                        'color:#3e4852;font-size:14px;font-weight:700;'
-                    )
-                    ui.element('div').style(
-                        'width:104px;height:3px;background:#3e4852;border-radius:999px;'
-                    )
 
-            with ui.element('div').classes('pm-chart-card w-full'):
-                with ui.row().classes('pm-bars w-full no-wrap').style('justify-content: space-between;'):
-                    bars = [42, 50, 58, 34, 74, 55, 47, 59, 58, 30, 66, 44, 73, 41, 68, 35, 52]
-                    styles = [
-                        'soft', '', '', 'soft', '', 'soft', '', '', 'soft',
-                        'red-soft', 'red', 'red-soft', 'red', 'red-soft', 'red', 'red-soft', 'red'
-                    ]
-                    for h, s in zip(bars, styles):
-                        ui.element('div').classes(f'pm-bar {s}').style(f'height:{h}px;')
+def consommation_page(installation_id: str | UUID | None = None) -> None:
+    mesure_svc = MesureService()
+    choix_svc  = ChoixAutoService()
 
-        with ui.column().classes('w-full').style('margin-top: 14px;'):
-            with ui.row().classes('w-full items-end justify-between').style(
-                'border-top: 1px solid #e7e7e7; padding-top: 12px;'
-            ):
-                ui.element('div')
-                with ui.column().classes('items-end').style('gap: 6px;'):
-                    ui.label('Tarifs du marché').style(
-                        'color:#3e4852;font-size:14px;font-weight:700;'
-                    )
-                    ui.element('div').style(
-                        'width:104px;height:3px;background:#3e4852;border-radius:999px;'
-                    )
+    def content() -> None:
+        current_installation_id = installation_id or SessionManager.get_installation_id()
+        installation_uuid = parse_uuid(current_installation_id)
 
-            data = [
-                ('Gaz', '$1300.50', 'https://i.pravatar.cc/60?img=32'),
-                ('Électricité', '$720.25', 'https://i.pravatar.cc/60?img=12'),
-                ('Charbon', '$420.83', 'https://i.pravatar.cc/60?img=48'),
-            ]
+        if installation_uuid is None:
+            notify_warning("Aucune installation valide n'est sélectionnée.")
+            ui.label("Aucune installation sélectionnée.").classes('text-base font-semibold text-red-500')
+            return
 
-            for name, price, avatar in data:
-                with ui.row().classes('w-full items-center justify-between').style(
-                    'padding: 12px 0; border-bottom: 1px solid #ececec;'
-                ):
-                    with ui.row().classes('items-center').style('gap: 12px;'):
-                        ui.image(avatar).classes('pm-avatar')
-                        ui.label(name).classes('pm-market-name')
-                    ui.label(price).classes('pm-market-price')
+        if not require_same_installation(str(installation_uuid)):
+            return
+
+        # Dernier choix auto
+        latest_choix = choix_svc.get_latest()
+        mode_actif   = (latest_choix.choix if latest_choix else '—').upper()
+        couleur_mode = '#5c67ec' if mode_actif == 'ELECTRIC' else '#f59e0b'
+
+        ui.label('Historique des mesures sur 7 jours.').classes('text-[#9ca4ae] text-sm -mt-1')
+
+        # --- KPI mode actif ---
+        with ui.card().classes('w-full p-4 mb-1'):
+            with ui.row().classes('items-center gap-3'):
+                ui.icon('bolt', color='blue').classes('text-3xl')
+                with ui.column().classes('gap-0'):
+                    ui.label('Mode énergétique actif').classes('text-xs text-gray-400')
+                    ui.label(mode_actif).style(f'font-size:1.3rem;font-weight:700;color:{couleur_mode}')
+
+        # --- Sélecteur de type de mesure ---
+        type_selectionne = {'id': 3}  # Température par défaut
+
+        graphique_container = ui.column().classes('w-full')
+
+        def afficher_graphique(type_id: int):
+            graphique_container.clear()
+            meta = TYPES.get(type_id, {'label': '?', 'unite': '', 'color': '#888', 'icon': 'sensors'})
+
+            with graphique_container:
+                historique = mesure_svc.list_historique_par_type(
+                    installation_uuid, type_id, jours=7, limit=200
+                )
+
+                if not historique:
+                    with ui.card().classes('w-full p-6 items-center'):
+                        ui.icon('bar_chart', color='grey').classes('text-4xl')
+                        ui.label('Aucune donnée sur les 7 derniers jours.').classes('text-sm text-gray-400')
+                    return
+
+                valeurs   = [h['value'] for h in historique if h['value'] is not None]
+                etiquettes = [_fmt_heure(h['created_at']) for h in historique if h['value'] is not None]
+
+                if not valeurs:
+                    ui.label('Données insuffisantes.').classes('text-sm text-gray-400')
+                    return
+
+                val_min = min(valeurs)
+                val_max = max(valeurs)
+                val_moy = round(sum(valeurs) / len(valeurs), 1)
+
+                # KPI min/moy/max
+                with ui.row().classes('w-full gap-2 flex-wrap mb-2'):
+                    for libelle, val in [('Min', val_min), ('Moy', val_moy), ('Max', val_max)]:
+                        with ui.card().classes('p-3 flex-1 min-w-[80px] items-center'):
+                            ui.label(libelle).classes('text-xs text-gray-400')
+                            ui.label(f"{val} {meta['unite']}").classes('text-base font-bold text-slate-700')
+
+                # Graphique ECharts
+                with ui.card().classes('w-full p-3'):
+                    # On ne prend que les 50 derniers points pour la lisibilité
+                    pts   = valeurs[-50:]
+                    lbls  = etiquettes[-50:]
+
+                    echart = ui.echart({
+                        'tooltip': {
+                            'trigger': 'axis',
+                            'formatter': f'{{b}}<br/>{{a}}: {{c}} {meta["unite"]}',
+                        },
+                        'grid': {'left': '8%', 'right': '4%', 'bottom': '18%', 'top': '8%'},
+                        'xAxis': {
+                            'type': 'category',
+                            'data': lbls,
+                            'axisLabel': {'rotate': 35, 'fontSize': 10},
+                        },
+                        'yAxis': {
+                            'type': 'value',
+                            'name': meta['unite'],
+                            'nameTextStyle': {'fontSize': 10},
+                        },
+                        'series': [{
+                            'name': meta['label'],
+                            'type': 'line',
+                            'data': pts,
+                            'smooth': True,
+                            'lineStyle': {'color': meta['color'], 'width': 2},
+                            'itemStyle': {'color': meta['color']},
+                            'areaStyle': {'color': meta['color'], 'opacity': 0.08},
+                            'symbol': 'circle',
+                            'symbolSize': 4,
+                        }],
+                    }).classes('w-full').style('height: 220px')
+
+                ui.label(f"{len(valeurs)} mesure(s) sur 7 jours.").classes('text-[10px] text-gray-300 text-right w-full')
+
+        # Boutons de sélection du type
+        with ui.row().classes('w-full gap-2 mb-2 flex-wrap'):
+            for tid, meta in TYPES.items():
+                def make_handler(t=tid):
+                    def handler():
+                        type_selectionne['id'] = t
+                        afficher_graphique(t)
+                    return handler
+                btn_color = 'blue-6' if tid == 3 else 'grey-5'
+                ui.button(
+                    meta['label'],
+                    icon=meta['icon'],
+                    on_click=make_handler()
+                ).props(f'color={btn_color} outline').classes('text-xs')
+
+        # Affichage initial
+        afficher_graphique(type_selectionne['id'])
+
+    dashboard_layout(title='Consommation', content=content, show_back=True)

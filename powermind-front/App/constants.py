@@ -14,11 +14,13 @@ DEFAULT_LANGUAGE = 'fr'
 ROLE_ADMIN = 'admin'
 ROLE_TECHNICIEN = 'technicien'
 ROLE_USER = 'user'
+ROLE_SUPER_ADMIN = 'super_admin'
 
 ROLES = [
     ROLE_ADMIN,
     ROLE_TECHNICIEN,
     ROLE_USER,
+    ROLE_SUPER_ADMIN,
 ]
 
 STATUS_OK = 'ok'
@@ -39,14 +41,19 @@ ROUTE_HOME = '/home'
 ROUTE_DATE_HEURE = '/date-heure'
 ROUTE_VALEURS_BASES = '/valeurs-bases'
 ROUTE_DASHBOARD = '/dashboard'
+ROUTE_ADMIN = '/admin/users'
+ROUTE_CONSOMMATION = '/consommation'
 ROUTE_INSTALLATIONS = '/installations'
 ROUTE_CAPTEURS = '/capteurs'
+ROUTE_FORBIDEN = '/forbiden'
+ROUTE_FORGOT_PASSWORD = '/forgot-password'
 ROUTE_MESURES = '/mesures'
 ROUTE_ALERTES = '/alertes'
 ROUTE_PROFIL = '/profil'
 ROUTE_REGLAGES = '/reglages'
 ROUTE_MAINTENANCE = '/maintenance'
 ROUTE_404 = '/404'
+ROUTE_WAITING = '/waiting'
 
 PUBLIC_ROUTES = {
     ROUTE_ROOT,
@@ -73,7 +80,7 @@ DEFAULT_REDIRECT_IF_NOT_AUTHENTICATED = ROUTE_LOGIN
 TABLE_PROFILES = 'profiles'
 TABLE_INSTALLATIONS = 'installations'
 TABLE_CAPTEURS = 'capteurs'
-TABLE_TYPES_MESURES = 'types_mesures'
+TABLE_TYPES_MESURES = 'types_mesure'
 TABLE_MESURES = 'mesures'
 TABLE_ALERTES = 'alertes'
 TABLE_CHOIX_AUTO = 'choix_auto'

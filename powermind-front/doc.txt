@@ -1,0 +1,87 @@
+Bonne question, laisse-moi vérifier précisément ce que j'ai fait par rapport au design original.J'ai maintenant une vision complète. Je te réponds honnêtement sur tout.
+
+---
+
+## ✅ Confirmation — Design préservé à 100%
+
+**Oui, j'ai gardé ton design dans tous les fichiers que j'ai modifiés.** Voici la confirmation précise :
+
+| Élément | Préservé ? | Détail |
+|---|---|---|
+| **Sidebar** (`render_sidebar`) | ✅ Intact | Jamais touché, toujours appelé via `dashboard_layout` |
+| **Topbar** (`render_topbar`) | ✅ Intact | Flèche retour, menu hamburger, ligne décorative |
+| **`dashboard_layout`** | ✅ Intact | Shell phone, `pm-app-shell`, 390px, rounded corners |
+| **`auth_layout`** | ✅ Intact | Shell téléphone auth, même proportions |
+| **`app_layout`** | ✅ Intact | Frame device, `pm-device-frame`, barre du bas |
+| **`render_action_button`** | ✅ Intact | Boutons coral/green/blue originaux |
+| **`render_sensor_card`** | ✅ Intact | Cards avec icône colorée + statut dot |
+| **`render_alert_badge`** | ✅ Intact | Badges dot colorés |
+| **CSS classes pm-\*** | ✅ Intact | Toutes les classes `pm-` originales conservées |
+
+> **La seule page où j'ai ajouté du style nouveau** c'est `consommation_page.py` (le graphique ECharts et les boutons de sélection), et `forgot_password_page.py` (nouveau fichier). Les deux utilisent quand même `dashboard_layout` / `auth_layout`, donc le shell phone est identique.
+
+---
+
+## 🔴 Un vrai problème à corriger dans la sidebar
+
+La sidebar a les noms d'utilisateur **codés en dur** :
+
+```python
+ui.label('Johanna Doe').classes('pm-drawer-name')
+ui.label('johanna@company.com').classes('pm-drawer-mail')
+ui.avatar('https://i.pravatar.cc/120?img=32')
+```
+
+Ce n'est pas bloquant mais c'est visible. Voici la correction rapide pour `sidebar.py` :
+
+```python
+# app/components/sidebar.py — section profil à remplacer
+
+from app.core.session import SessionManager   # ← ajouter cet import en haut
+
+# Remplacer le bloc pm-drawer-profile par :
+with ui.element('div').classes('pm-drawer-profile'):
+    ui.icon('account_circle').style('font-size: 72px; color: #c3c9d1;')
+    full_name = SessionManager.get_full_name() or 'Utilisateur'
+    email     = SessionManager.get_email()    or ''
+    ui.label(full_name).classes('pm-drawer-name')
+    if email:
+        ui.label(email).classes('pm-drawer-mail')
+```
+
+---
+
+## 💡 Évolutions possibles — liste complète
+
+Voici tout ce qu'on peut encore faire, classé par effort :
+
+### 🟢 Rapide (1 fichier chacun)
+| Évolution | Description |
+|---|---|
+| **Sidebar dynamique** | Noms/email réels depuis session (voir ci-dessus) |
+| **Route active dans sidebar** | Mettre `active: True` sur l'item correspondant à la page courante |
+| **Page 404 designée** | Vraie page 404 avec le shell phone et un bouton retour |
+| **Badge alertes dans sidebar** | Afficher un badge rouge avec le nombre d'alertes actives |
+| **Trier les mesures par capteur** | Dans `mesures_page` : regrouper par capteur avec accordéon |
+| **Polling alertes en home** | `ui.timer()` sur `home_page` pour badge d'alerte live |
+
+### 🟡 Moyen (2-3 fichiers)
+| Évolution | Description |
+|---|---|
+| **Page capteurs enrichie** | Clic sur un capteur → voir ses mesures + dernière alerte |
+| **Graphique dashboard** | Mini sparkline température des 24h sur le dashboard |
+| **Export CSV mesures** | Bouton dans `mesures_page` → téléchargement des données |
+| **Page d'onboarding** | Première connexion sans installation → guide de création |
+| **Notifications push** | Supabase Realtime → alerte dans l'UI dès qu'une alerte est insérée en BDD |
+| **Filtres sur mesures** | Date range picker + filtre par type dans `mesures_page` |
+
+### 🔴 Ambitieux (refonte partielle)
+| Évolution | Description |
+|---|---|
+| **Supabase Realtime** | WebSocket sur la table `mesures` → mise à jour instantanée sans timer |
+| **Multi-installation** | Switcher d'installation dans la topbar pour les admins |
+| **Mode hors-ligne** | Cache local des dernières mesures si Supabase est inaccessible |
+| **Rapports PDF** | Génération d'un rapport mensuel des mesures avec graphiques |
+| **Admin dashboard** | Tableau de bord admin avec stats globales toutes installations |
+
+**Qu'est-ce qui t'intéresse le plus parmi ces évolutions ?**

@@ -7,12 +7,12 @@ from app.models.base import AppBaseModel, MesureValueType, UUIDTimestampedModel,
 
 class MesureBase(AppBaseModel):
     capteur_id: UUID
-    type_mesure_id: UUID
-    valeur: MesureValueType
+    type_mesure_id: int  # int2 en BDD (1:CO2, 2:Humidité, 3:Température, 4:Présence)
+    value: MesureValueType  # ATTENTION: colonne 'value' en BDD (pas 'valeur')
 
 
 class Mesure(MesureBase, UUIDTimestampedModel):
-    pass
+    id: int  # int8 en BDD
 
 
 class MesureCreate(MesureBase):
@@ -20,19 +20,19 @@ class MesureCreate(MesureBase):
 
 
 class MesureUpdate(AppBaseModel):
-    valeur: MesureValueType | None = None
+    value: MesureValueType | None = None
 
 
 class MesureSummary(MesureBase, UUIDTimestampedModel):
-    pass
+    id: int
 
 
 class MesureWithMeta(AppBaseModel):
-    id: UUID
+    id: int  # int8 en BDD
     capteur_id: UUID
     capteur_nom: str
-    type_mesure_id: UUID
+    type_mesure_id: int
     type_mesure_code: str
     unite: str | None = None
-    valeur: MesureValueType
+    value: MesureValueType  # colonne 'value' en BDD
     created_at: datetime
