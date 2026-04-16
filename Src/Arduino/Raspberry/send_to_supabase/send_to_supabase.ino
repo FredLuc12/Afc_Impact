@@ -5,9 +5,9 @@
 #include <SensirionI2cScd4x.h>
 
 // ----------- CONFIG -----------
-const char* ssid = "iPhone de Alyssa";
-const char* password = "azerty123";
-const char* mqtt_server = "172.20.10.2";
+const char* ssid = "";
+const char* password = "";
+const char* mqtt_server = "";
 
 // ----------- OBJETS -----------
 WiFiClient espClient;
