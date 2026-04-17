@@ -1,4 +1,12 @@
 # app/services/mesure_service.py
+# Schéma BDD :
+#   mesures : id(int8), capteur_id(uuid FK→capteurs), type_mesure_id(int2 FK→types_mesure), value(numeric), created_at
+#   capteurs : id(uuid), installation_id(uuid FK→installations), type(text), nom(text)
+#   types_mesure : id(int2), code(text), unite(text)
+#
+# Jointure pour filtrer par installation :
+#   mesures → capteurs (via capteur_id) → filter sur capteurs.installation_id
+#   mesures → types_mesure (via type_mesure_id) → pour avoir code + unite
 
 from datetime import datetime, timedelta
 from uuid import UUID
@@ -27,17 +35,17 @@ class MesureService(BaseService):
         data = self.extract_data(response) or []
         return [Mesure(**item) for item in data]
 
-    def list_by_capteur(self, capteur_id: UUID, limit: int = 100) -> list[Mesure]:
+    def list_by_capteur(self, capteur_id: UUID, limit: int = 100) -> list[dict]:
+        """Mesures d'un capteur avec infos types_mesure."""
         response = (
             self.table()
-            .select('*')
+            .select('id, value, created_at, type_mesure_id, types_mesure(id, code, unite)')
             .eq('capteur_id', str(capteur_id))
             .order('created_at', desc=True)
             .limit(limit)
             .execute()
         )
-        data = self.extract_data(response) or []
-        return [Mesure(**item) for item in data]
+        return self.extract_data(response) or []
 
     def list_by_type_mesure(self, type_mesure_id: int, limit: int = 100) -> list[Mesure]:
         response = (
@@ -52,9 +60,21 @@ class MesureService(BaseService):
         return [Mesure(**item) for item in data]
 
     def list_by_installation(self, installation_id: UUID, limit: int = 100) -> list[dict]:
+        """
+        Retourne les mesures de tous les capteurs d'une installation.
+        Jointure : mesures → capteurs (filtre installation_id) + types_mesure (code, unite).
+        Chaque dict contient :
+          - value, created_at, type_mesure_id  (colonnes mesures)
+          - capteurs: {id, nom, installation_id}
+          - types_mesure: {id, code, unite}
+        """
         response = (
             self.table()
-            .select('*, capteurs!inner(id, nom, installation_id), types_mesure(id, code, unite)')
+            .select(
+                'id, value, created_at, capteur_id, type_mesure_id, '
+                'capteurs!inner(id, nom, installation_id), '
+                'types_mesure(id, code, unite)'
+            )
             .eq('capteurs.installation_id', str(installation_id))
             .order('created_at', desc=True)
             .limit(limit)
@@ -70,9 +90,9 @@ class MesureService(BaseService):
         limit: int = 200,
     ) -> list[dict]:
         """
-        Retourne l'historique d'un type de mesure sur N jours pour une installation.
-        Utilisé pour construire les graphiques (consommation, dashboard temps réel).
-        Retourne: [{'value': int, 'created_at': str, 'capteur_nom': str}, ...]
+        Historique d'un type de mesure sur N jours pour une installation.
+        Filtre : capteurs.installation_id + type_mesure_id.
+        Retourne : [{'value': numeric, 'created_at': str, 'capteur_nom': str}]
         """
         since = (datetime.utcnow() - timedelta(days=jours)).isoformat()
         response = (
@@ -106,7 +126,7 @@ class MesureService(BaseService):
         data = self.extract_data(response) or []
         results = []
         for item in data:
-            capteur = item.get('capteurs') or {}
+            capteur    = item.get('capteurs') or {}
             type_mesure = item.get('types_mesure') or {}
             results.append(
                 MesureWithMeta(
