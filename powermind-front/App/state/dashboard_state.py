@@ -1,6 +1,6 @@
 # app/state/dashboard_state.py
+# alertes en BDD : seulement capteur_id + message — pas de champ 'statut'
 
-from app.models.alerte import Alerte
 from app.models.capteur import Capteur
 from app.models.installation import Installation
 from app.models.mesure import MesureWithMeta
@@ -12,11 +12,11 @@ class DashboardState:
         self.selected_installation: Installation | None = None
         self.capteurs: list[Capteur] = []
         self.mesures: list[MesureWithMeta] = []
-        self.alertes: list[Alerte] = []
+        self.alertes: list[dict] = []   # dicts bruts BDD (capteur_id, message)
         self.stats: dict = {
             'installations_count': 0,
             'capteurs_count': 0,
-            'alertes_actives_count': 0,
+            'alertes_count': 0,
             'mesures_count': 0,
         }
         self.is_loading: bool = False
@@ -31,7 +31,7 @@ class DashboardState:
         self.stats = {
             'installations_count': 0,
             'capteurs_count': 0,
-            'alertes_actives_count': 0,
+            'alertes_count': 0,
             'mesures_count': 0,
         }
         self.is_loading = False
@@ -55,8 +55,9 @@ class DashboardState:
         self.error = None
 
     @property
-    def active_alertes(self) -> list[Alerte]:
-        return [a for a in self.alertes if a.statut == 'active']
+    def alertes_count(self) -> int:
+        """Toutes les alertes sont actives en BDD (pas de champ statut)."""
+        return len(self.alertes)
 
     @property
     def has_data(self) -> bool:
