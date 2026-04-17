@@ -1,9 +1,4 @@
 # app/pages/valeurs_bases_page.py
-# CORRECTIONS :
-# - update_usage_mode : synchrone (pas async) — FIX erreur 500
-# - Valeurs toggle alignées sur la BDD ('electric' / 'gaz') via mapping
-# - Logique intelligente : mode UI ↔ valeur BDD séparés
-# - Affichage dynamique de la description sans rechargement
 
 from nicegui import ui
 from uuid import UUID
@@ -15,20 +10,17 @@ from app.core.session import SessionManager
 from app.services.mesure_service import MesureService
 from app.services.alerte_service import AlerteService
 from app.services.choix_auto_service import ChoixAutoService
-from app.models.choix_auto import ChoixAutoCreate
 
 
-# ── Mapping UI ↔ valeur réelle colonne 'choix' en BDD ─────────────
-MODE_UI_TO_DB: dict[str, str] = {
-    'confort':    'electric',
-    'ecologique': 'electric',
-    'economique': 'gaz',
+MODES = ['confort', 'ecologique', 'economique']
+
+MODE_LABELS = {
+    'confort':    'Confort',
+    'ecologique': 'Écologique',
+    'economique': 'Économique',
 }
-MODE_DB_TO_UI: dict[str, str] = {
-    'electric': 'confort',
-    'gaz':      'economique',
-}
-MODE_DESCRIPTIONS: dict[str, str] = {
+
+MODE_DESCRIPTIONS = {
     'confort':    'Priorité au bien-être thermique. Le système choisit automatiquement la source la plus performante.',
     'ecologique': 'Priorité à la PAC (énergie propre). Bascule gaz uniquement si rendement insuffisant.',
     'economique': 'Optimisation tarifaire. La chaudière gaz est activée pendant les heures creuses pour réduire la facture.',
@@ -57,11 +49,13 @@ def valeurs_bases_page() -> None:
             return
 
         # ── Chargement BDD ─────────────────────────────────────────
-        latest_choix    = choix_service.get_latest()
-        db_choix        = latest_choix.choix if latest_choix else 'electric'
-        current_ui_mode = MODE_DB_TO_UI.get(db_choix, 'confort')
-        recent_mesures  = mesure_service.list_by_installation(inst_id, limit=20)
-        alertes         = alerte_service.list_by_installation(inst_id)
+        # Récupère le choix propre à CETTE installation
+        current_choix  = choix_service.get_by_installation(inst_id)
+        db_choix       = current_choix.choix if current_choix else 'confort'
+        current_mode   = db_choix if db_choix in MODES else 'confort'
+
+        recent_mesures = mesure_service.list_by_installation(inst_id, limit=20)
+        alertes        = alerte_service.list_by_installation(inst_id)
 
         def get_val(code: str) -> tuple[str, str]:
             for m in recent_mesures:
@@ -70,20 +64,19 @@ def valeurs_bases_page() -> None:
                     return str(m.get('value', 'N/A')), tm.get('unite', '')
             return 'N/A', ''
 
-        # ── FIX CRITIQUE : fonction SYNCHRONE (pas async) ──────────
-        # async + ui.notify() sans contexte = erreur 500 NiceGUI
+        # ── UPSERT synchrone — 1 ligne par installation ────────────
         def update_usage_mode(e) -> None:
-            ui_mode = e.value
-            db_val  = MODE_UI_TO_DB.get(ui_mode, 'electric')
+            ui_mode = e.value  # 'confort' | 'ecologique' | 'economique'
             try:
-                choix_service.create(ChoixAutoCreate(choix=db_val))
+                # UPSERT : crée ou écrase la ligne de cette installation
+                choix_service.upsert(inst_id, ui_mode)
                 desc_label.text = MODE_DESCRIPTIONS.get(ui_mode, '')
-                db_label.text   = f'Valeur BDD enregistrée : « {db_val} »'
-                ui.notify(f'Mode {ui_mode.upper()} activé.', type='positive', icon='check')
+                db_label.text   = f'Valeur BDD : « {ui_mode} »'
+                ui.notify(f'Mode {MODE_LABELS[ui_mode]} activé.', type='positive', icon='check')
             except Exception as ex:
                 ui.notify(f'Erreur enregistrement : {ex}', type='negative')
 
-        # ── Styles (identiques à l'original) ───────────────────────
+        # ── Styles ─────────────────────────────────────────────────
         ui.add_head_html('''
         <style>
             .vb-title         { color:#3f4854;font-size:24px;font-weight:700;margin-bottom:6px; }
@@ -113,30 +106,30 @@ def valeurs_bases_page() -> None:
         with ui.card().classes('vb-panel w-full'):
             ui.label('Définissez la priorité du système :').classes('vb-kpi-label')
             ui.toggle(
-                {'confort': 'Confort', 'ecologique': 'Écologique', 'economique': 'Économique'},
-                value=current_ui_mode,
+                {k: v for k, v in MODE_LABELS.items()},
+                value=current_mode,
                 on_change=update_usage_mode,
             ).props('unelevated color=primary')
 
             with ui.column().classes('mt-4 p-3 rounded-lg w-full').style('background:#f8fafc;'):
                 ui.label('Description').classes('vb-kpi-label')
-                desc_label = ui.label(MODE_DESCRIPTIONS.get(current_ui_mode, '')).classes('text-sm text-slate-600')
-                db_label   = ui.label(f'Valeur BDD enregistrée : « {db_choix} »').classes('vb-db-hint')
+                desc_label = ui.label(MODE_DESCRIPTIONS.get(current_mode, '')).classes('text-sm text-slate-600')
+                db_label   = ui.label(f'Valeur BDD : « {db_choix} »').classes('vb-db-hint')
 
         # ── État général ───────────────────────────────────────────
         ui.label('État général').classes('vb-section-title')
         with ui.row().classes('w-full').style('gap:10px;flex-wrap:wrap;'):
             with ui.card().classes('vb-kpi-card').style('flex:1;min-width:150px;'):
                 ui.label('Mode actif').classes('vb-kpi-label')
-                ui.label(current_ui_mode.capitalize()).classes('vb-kpi-value')
-                render_alert_badge('Priorité PAC' if db_choix == 'electric' else 'Gaz activé', 'info')
+                ui.label(MODE_LABELS.get(current_mode, current_mode)).classes('vb-kpi-value')
+                ui.label('Système PowerMind').classes('vb-kpi-note')
 
             with ui.card().classes('vb-kpi-card').style('flex:1;min-width:150px;'):
                 ui.label('Alertes actives').classes('vb-kpi-label')
                 ui.label(str(len(alertes))).classes('vb-kpi-value')
                 render_alert_badge('À traiter' if alertes else 'RAS', 'danger' if alertes else 'success')
 
-        # ── Capteurs de référence ──────────────────────────────────
+        # ── Capteurs ───────────────────────────────────────────────
         ui.label('Capteurs de référence').classes('vb-section-title')
         with ui.row().classes('w-full').style('gap:12px;flex-wrap:wrap;'):
             for card in SENSOR_CARDS:
@@ -160,14 +153,14 @@ def valeurs_bases_page() -> None:
         ui.label('Consignes système').classes('vb-section-title')
         with ui.card().classes('vb-panel w-full'):
             for label, value in [
-                ('Température économique',    '18°C'),
-                ('Température absence',       '16°C'),
-                ('Humidité confort',          '40% – 60%'),
-                ('Seuil CO₂ alerte',          '1000 ppm'),
-                ('Délai détection présence',  '< 3 s'),
-                ('Bascule chaudière gaz',     'Activée'),
-                ('Source prioritaire',        'PAC'),
-                ('Dernière synchronisation',  'Aujourd\'hui à 14:20'),
+                ('Température économique',   '18°C'),
+                ('Température absence',      '16°C'),
+                ('Humidité confort',         '40% – 60%'),
+                ('Seuil CO₂ alerte',         '1000 ppm'),
+                ('Délai détection présence', '< 3 s'),
+                ('Bascule chaudière gaz',    'Activée'),
+                ('Source prioritaire',       'PAC'),
+                ('Dernière synchronisation', "Aujourd'hui à 14:20"),
             ]:
                 with ui.row().classes('vb-row w-full'):
                     ui.label(label).classes('vb-row-label')
