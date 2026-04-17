@@ -50,7 +50,7 @@ def consommation_page(installation_id: str | UUID | None = None) -> None:
             return
 
         # Dernier choix auto
-        latest_choix = choix_svc.get_latest()
+        latest_choix = choix_svc.get_by_installation(installation_uuid)
         mode_actif   = (latest_choix.choix if latest_choix else '—').upper()
         couleur_mode = '#5c67ec' if mode_actif == 'ELECTRIC' else '#f59e0b'
 
