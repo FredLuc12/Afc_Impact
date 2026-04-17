@@ -1,6 +1,5 @@
 # app/services/type_mesure_service.py
-
-from uuid import UUID
+# id est int2 en BDD (pas UUID)
 
 from app.constants import TABLE_TYPES_MESURES
 from app.models.type_mesure import TypeMesure, TypeMesureCreate, TypeMesureUpdate
@@ -10,8 +9,8 @@ from app.services.base_service import BaseService
 class TypeMesureService(BaseService):
     table_name = TABLE_TYPES_MESURES
 
-    def get_by_id(self, type_mesure_id: UUID) -> TypeMesure | None:
-        response = self.table().select('*').eq('id', str(type_mesure_id)).maybe_single().execute()
+    def get_by_id(self, type_mesure_id: int) -> TypeMesure | None:
+        response = self.table().select('*').eq('id', type_mesure_id).maybe_single().execute()
         data = self.extract_data(response)
         return TypeMesure(**data) if data else None
 
@@ -21,7 +20,7 @@ class TypeMesureService(BaseService):
         return TypeMesure(**data) if data else None
 
     def list_all(self) -> list[TypeMesure]:
-        response = self.table().select('*').order('code').execute()
+        response = self.table().select('*').order('id').execute()
         data = self.extract_data(response) or []
         return [TypeMesure(**item) for item in data]
 
@@ -30,15 +29,15 @@ class TypeMesureService(BaseService):
         data = self.extract_data(response)[0]
         return TypeMesure(**data)
 
-    def update(self, type_mesure_id: UUID, payload: TypeMesureUpdate) -> TypeMesure:
+    def update(self, type_mesure_id: int, payload: TypeMesureUpdate) -> TypeMesure:
         response = (
             self.table()
             .update(payload.model_dump(exclude_none=True))
-            .eq('id', str(type_mesure_id))
+            .eq('id', type_mesure_id)
             .execute()
         )
         data = self.extract_data(response)[0]
         return TypeMesure(**data)
 
-    def delete(self, type_mesure_id: UUID):
-        return self.table().delete().eq('id', str(type_mesure_id)).execute()
+    def delete(self, type_mesure_id: int):
+        return self.table().delete().eq('id', type_mesure_id).execute()
