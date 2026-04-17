@@ -1,7 +1,4 @@
 # app/pages/home_page.py
-# CORRECTIONS BDD:
-# - choix_auto: colonne 'choix' (pas '.mode'), pas de FK installation_id
-# - mesures: colonne 'value' (pas 'valeur'), jointure 'types_mesure' (pas 'types_mesures')
 
 from datetime import datetime
 from uuid import UUID
@@ -14,10 +11,19 @@ from app.services.mesure_service import MesureService
 from app.services.choix_auto_service import ChoixAutoService
 from app.constants import ROUTE_LOGIN, ROUTE_DASHBOARD, ROUTE_VALEURS_BASES
 
+# Affichage lisible — gère aussi les anciennes valeurs 'electric'/'gaz'
+MODE_DISPLAY: dict[str, str] = {
+    'confort':    'CONFORT',
+    'ecologique': 'ÉCOLOGIQUE',
+    'economique': 'ÉCONOMIQUE',
+    'electric':   'ÉLECTRIQUE',
+    'gaz':        'GAZ',
+}
+
 
 def home_page() -> None:
     mesure_service = MesureService()
-    choix_service = ChoixAutoService()
+    choix_service  = ChoixAutoService()
 
     inst_id_str = SessionManager.get_installation_id()
     inst_id = UUID(inst_id_str) if inst_id_str else None
@@ -27,29 +33,26 @@ def home_page() -> None:
             if not SessionManager.is_authenticated():
                 ui.navigate.to(ROUTE_LOGIN)
                 return
-            if target == 'chauffage':
-                path = f"{ROUTE_DASHBOARD}/{inst_id}" if inst_id else ROUTE_DASHBOARD
-                ui.navigate.to(path)
-            else:
-                ui.navigate.to(ROUTE_VALEURS_BASES)
+            ui.navigate.to(ROUTE_DASHBOARD if target == 'chauffage' else ROUTE_VALEURS_BASES)
 
-        # Dernier choix auto global (pas de FK installation_id dans choix_auto)
-        latest_choix = choix_service.get_latest()
-        # Colonne 'choix' (pas '.mode') — valeurs: 'electric', 'gaz'
-        mode_text = latest_choix.choix.upper() if latest_choix else "MANUEL"
+        # Récupère le choix propre à CETTE installation (pas global)
+        mode_text = 'MANUEL'
+        if inst_id:
+            current_choix = choix_service.get_by_installation(inst_id)
+            if current_choix:
+                raw = current_choix.choix
+                mode_text = MODE_DISPLAY.get(raw, raw.upper())
 
-        temp_int = "N/A"
-        temp_ext = "N/A"
+        temp_int = 'N/A'
+        temp_ext = 'N/A'
         if inst_id:
             recent = mesure_service.list_by_installation(inst_id, limit=10)
             for m in recent:
-                # Jointure 'types_mesure' (sans 's' — nom réel BDD)
-                tm = m.get('types_mesure') or {}
+                tm   = m.get('types_mesure') or {}
                 code = tm.get('code')
-                # Colonne 'value' (pas 'valeur')
-                if code == 'TEMP_INT':
+                if code == 'TEMP_INT' and temp_int == 'N/A':
                     temp_int = f"{m.get('value', '?')}°C"
-                if code == 'TEMP_EXT':
+                if code == 'TEMP_EXT' and temp_ext == 'N/A':
                     temp_ext = f"{m.get('value', '?')}°C"
 
         ui.add_head_html('''
