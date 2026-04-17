@@ -19,26 +19,15 @@ class AuthService:
             },
         })
 
-        user = getattr(response, 'user', None)
+        user    = getattr(response, 'user', None)
         session = getattr(response, 'session', None)
 
         if user:
-            return {
-                'success': True,
-                'message': 'Utilisateur créé.',
-                'user': user,
-                'session': session,
-            }
-
-        return {
-            'success': False,
-            'message': 'La création du compte a échoué.',
-        }
-
-    # app/services/auth_service.py
+            return {'success': True, 'message': 'Utilisateur créé.', 'user': user, 'session': session}
+        return {'success': False, 'message': 'La création du compte a échoué.'}
 
     def login_user(self, identifier: str, password: str) -> dict:
-        email = (identifier or '').strip()
+        email    = (identifier or '').strip()
         password = password or ''
 
         if not email or not password:
@@ -46,7 +35,7 @@ class AuthService:
 
         try:
             response = self.supabase.auth.sign_in_with_password({'email': email, 'password': password})
-            user = getattr(response, 'user', None)
+            user    = getattr(response, 'user', None)
             session = getattr(response, 'session', None)
 
             if not user:
@@ -54,26 +43,46 @@ class AuthService:
 
             user_id = getattr(user, 'id', None)
             profile = {}
-            installations = [] # On passe au pluriel pour gérer plusieurs sites
+            installations = []
 
             if user_id:
-                # 1. Récupération du profil
-                profile_res = self.supabase.table('profiles').select('*').eq('id', user_id).maybe_single().execute()
+                # 1. Profil
+                profile_res = (
+                    self.supabase.table('profiles')
+                    .select('*')
+                    .eq('id', user_id)
+                    .maybe_single()
+                    .execute()
+                )
                 profile = profile_res.data or {}
                 role = profile.get('role', 'user')
 
-                # 2. Logique selon le rôle
+                # 2. Installations
                 if role in ['admin', 'super_admin']:
-                    # Un admin veut souvent voir la liste globale ou TOUTES les installations
-                    # Pour l'instant, on récupère les dernières installations créées globalement
-                    inst_res = self.supabase.table('installations').select('*').order('created_at', desc=True).limit(5).execute()
-                    installations = inst_res.data or []
+                    # Admin : toutes les installations (les 10 plus récentes)
+                    inst_res = (
+                        self.supabase.table('installations')
+                        .select('*')
+                        .order('created_at', desc=True)
+                        .limit(10)
+                        .execute()
+                    )
                 else:
-                    # Un utilisateur standard : on récupère SES installations uniquement
-                    inst_res = self.supabase.table('installations').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
-                    installations = inst_res.data or []
+                    # FIX CRITIQUE : on filtre par user_id (colonne profiles.id = installations.user_id)
+                    # Si aucune installation trouvée → l'user n'en a pas encore (page d'attente)
+                    inst_res = (
+                        self.supabase.table('installations')
+                        .select('*')
+                        .eq('user_id', user_id)
+                        .order('created_at', desc=True)
+                        .execute()
+                    )
 
-            # On renvoie la première installation comme "active" par défaut, ou None si vide
+                installations = inst_res.data or []
+
+                # DEBUG : affiche en console pour vérifier
+                print(f"[AUTH] user_id={user_id} | role={role} | installations trouvées={len(installations)}")
+
             default_installation = installations[0] if installations else {}
 
             return {
@@ -83,7 +92,10 @@ class AuthService:
                 'session': session,
                 'profile': profile,
                 'installation': default_installation,
-                'all_installations': installations # Utile pour un sélecteur de site
+                'all_installations': installations,
             }
+
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return {'success': False, 'message': f'Erreur technique : {str(e)}'}
