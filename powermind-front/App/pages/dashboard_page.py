@@ -1,9 +1,5 @@
-# app/pages/dashboard_page.py
-# IDs types_mesure en BDD : 1=CO2, 2=Humidité, 3=Température, 4=Présence
-
 from __future__ import annotations
 from uuid import UUID
-
 from nicegui import ui
 
 from app.core.notifications import notify_error, notify_warning
@@ -14,7 +10,6 @@ from app.layouts.dashboard_layout import dashboard_layout
 from app.services.dashboard_service import DashboardService
 from app.services.mesure_service import MesureService
 
-# IDs BDD types_mesure
 TYPE_CO2  = 1
 TYPE_HUM  = 2
 TYPE_TEMP = 3
@@ -30,7 +25,7 @@ def dashboard_page(installation_id: str | UUID | None = None) -> None:
 
         if installation_uuid is None:
             notify_warning("Aucune installation valide n'est sélectionnée.")
-            ui.label('Aucune installation sélectionnée.').classes('text-base font-semibold text-red-500')
+            ui.label('Aucune installation sélectionnée.').classes('text-red-500')
             return
 
         if not require_same_installation(str(installation_uuid)):
@@ -40,111 +35,173 @@ def dashboard_page(installation_id: str | UUID | None = None) -> None:
             data = service.get_installation_overview(installation_uuid)
         except Exception as e:
             notify_error(f'Erreur chargement dashboard : {str(e)}')
-            ui.label('Impossible de charger les données.').classes('text-base font-semibold text-red-500')
             return
 
-        installation = data.get('installation') or {}
-        capteurs     = data.get('capteurs') or []
-        alertes      = data.get('alertes') or []
-        latest_choix = data.get('latest_choix_auto') or {}
+        capteurs = data.get('capteurs') or []
+        alertes  = data.get('alertes') or []
 
-        # --- En-tête ---
-        ui.label(f"Installation : {installation.get('nom', '—')}").classes('text-base font-semibold')
-        ui.label('Supervision en temps réel — PowerMind.').classes('text-[#9ca4ae] text-sm -mt-1')
+        # ==========================
+        # STATE
+        # ==========================
+        consigne_temp = {'value': 21}
+        energie_mode  = {'value': 'electric'}
 
-        # --- KPIs ---
-        with ui.row().classes('gap-3 flex-wrap w-full'):
-            with ui.card().classes('p-4 flex-1 min-w-[130px]'):
-                ui.label('Capteurs').classes('text-xs text-gray-400')
-                ui.label(str(len(capteurs))).classes('text-2xl font-bold text-slate-700')
+        # ==========================
+        # TABS
+        # ==========================
+        with ui.tabs().classes('w-full') as tabs:
+            tab_manuel = ui.tab('Manuel', icon='tune')
+            tab_auto   = ui.tab('Automatique', icon='smart_toy')
 
-            with ui.card().classes('p-4 flex-1 min-w-[130px]'):
-                ui.label('Alertes').classes('text-xs text-gray-400')
-                nb_alertes = len(alertes)
-                couleur = 'text-red-500' if nb_alertes else 'text-green-500'
-                ui.label(str(nb_alertes)).classes(f'text-2xl font-bold {couleur}')
+        with ui.tab_panels(tabs, value=tab_manuel).classes('w-full'):
 
-            with ui.card().classes('p-4 flex-1 min-w-[130px]'):
-                ui.label('Énergie active').classes('text-xs text-gray-400')
-                # latest_choix est un dict BDD après Option B
-                choix_val = (latest_choix.get('choix') or '—').upper()
-                couleur_e = 'text-blue-500' if choix_val in ('ELECTRIC', 'CONFORT', 'ECOLOGIQUE') else 'text-orange-500'
-                ui.label(choix_val).classes(f'text-xl font-bold {couleur_e}')
+            # ======================================================
+            # ONGLET MANUEL
+            # ======================================================
+            with ui.tab_panel(tab_manuel):
 
-        ui.element('div').style('height: 4px')
+                # --- Controle température ---
+                with ui.row().classes('w-full justify-center mt-4'):
 
-        # --- Mesures temps réel ---
-        ui.label('Dernières mesures').classes('text-sm font-semibold mt-2')
+                    with ui.column().classes('items-center gap-4'):
 
-        with ui.row().classes('w-full gap-2 flex-wrap'):
-            with ui.card().classes('p-3 flex-1 min-w-[100px] items-center'):
-                ui.icon('device_thermostat', color='red').classes('text-2xl')
-                ui.label('Température').classes('text-xs text-gray-400')
-                temp_label = ui.label('—').classes('text-xl font-bold text-slate-700')
-            with ui.card().classes('p-3 flex-1 min-w-[100px] items-center'):
-                ui.icon('water_drop', color='blue').classes('text-2xl')
-                ui.label('Humidité').classes('text-xs text-gray-400')
-                hum_label = ui.label('—').classes('text-xl font-bold text-slate-700')
-            with ui.card().classes('p-3 flex-1 min-w-[100px] items-center'):
-                ui.icon('co2', color='orange').classes('text-2xl')
-                ui.label('CO₂').classes('text-xs text-gray-400')
-                co2_label = ui.label('—').classes('text-xl font-bold text-slate-700')
+                        def increase():
+                            consigne_temp['value'] += 1
+                            temp_display.text = f"{consigne_temp['value']}°C"
 
-        derniere_maj = ui.label('').classes('text-[10px] text-gray-300 text-right w-full')
+                        def decrease():
+                            consigne_temp['value'] -= 1
+                            temp_display.text = f"{consigne_temp['value']}°C"
 
-        def refresh_mesures():
-            try:
-                # list_by_installation retourne des dicts avec :
-                # - type_mesure_id (int) directement sur le dict racine
-                # - types_mesure: {code, unite} pour l'unité
-                mesures = mesure_svc.list_by_installation(installation_uuid, limit=50)
+                    with ui.row().classes('items-center gap-4'):
+                        ui.button('-', on_click=decrease).props('round color=red')
+                        temp_display = ui.label(f"{consigne_temp['value']}°C").classes('text-3xl font-bold')
+                        ui.button('+', on_click=increase).props('round color=green')
 
-                valeurs: dict[int, str | None] = {TYPE_TEMP: None, TYPE_HUM: None, TYPE_CO2: None}
+                # --- Choix énergie ---
+                with ui.row().classes('w-full justify-center mt-6 items-center gap-4'):
 
-                for m in mesures:
-                    # type_mesure_id est une colonne directe de mesures (int2)
-                    tid = m.get('type_mesure_id')
-                    if tid in valeurs and valeurs[tid] is None:
-                        tm    = m.get('types_mesure') or {}
-                        unite = tm.get('unite', '')
-                        val   = m.get('value')
-                        if val is not None:
-                            valeurs[tid] = f"{val} {unite}".strip()
+                    def set_gaz():
+                        energie_mode['value'] = 'gaz'
 
-                temp_label.text = valeurs[TYPE_TEMP] or '—'
-                hum_label.text  = valeurs[TYPE_HUM]  or '—'
-                co2_label.text  = valeurs[TYPE_CO2]  or '—'
+                    def set_elec():
+                        energie_mode['value'] = 'electric'
 
-                from datetime import datetime
-                derniere_maj.text = f"Mis à jour : {datetime.now().strftime('%H:%M:%S')}"
-            except Exception as ex:
-                print(f"[dashboard] refresh_mesures error: {ex}")
+                    def update_energy_buttons():
+                        gaz_btn.props(f"color={'red' if energie_mode['value']=='gaz' else 'grey'}")
+                        elec_btn.props(f"color={'green' if energie_mode['value']=='electric' else 'grey'}")
 
-        refresh_mesures()
-        ui.timer(30.0, refresh_mesures)
+                def set_gaz():
+                    energie_mode['value'] = 'gaz'
+                    update_energy_buttons()
 
-        ui.element('div').style('height: 4px')
+                def set_elec():
+                    energie_mode['value'] = 'electric'
+                    update_energy_buttons()
 
-        # --- Liste capteurs ---
-        with ui.card().classes('w-full p-4'):
-            ui.label('Capteurs enregistrés').classes('text-sm font-semibold mb-2')
-            if capteurs:
-                for capteur in capteurs[:8]:
-                    with ui.row().classes('w-full items-center justify-between py-1 border-b border-gray-50 last:border-0'):
-                        ui.label(capteur.get('nom', 'Capteur')).classes('text-sm')
-                        ui.label(capteur.get('type', '—')).classes('text-xs text-gray-400')
-            else:
-                ui.label('Aucun capteur.').classes('text-sm text-gray-500')
+                with ui.row().classes('w-full justify-center mt-6'):
+                        with ui.row().classes('items-center gap-4'):
+                            gaz_btn = ui.button('Gaz', on_click=set_gaz).classes('w-32')
+                            elec_btn = ui.button('Électrique', on_click=set_elec).classes('w-32')
 
-        # --- Alertes ---
-        if alertes:
-            ui.element('div').style('height: 4px')
-            with ui.card().classes('w-full p-4 border-l-4 border-orange-400'):
-                ui.label(f'{len(alertes)} alerte(s)').classes('text-sm font-semibold text-orange-600 mb-2')
-                for alerte in alertes[:3]:
-                    cap_info = alerte.get('capteurs') or {}
-                    ui.label(
-                        f"• {cap_info.get('nom', '?')} — {alerte.get('message', '—')}"
-                    ).classes('text-xs text-slate-600')
+                update_energy_buttons()
+
+                ui.separator()
+
+                # --- PARTIE COMMUNE ---
+                render_common_section(mesure_svc, installation_uuid, capteurs)
+
+            # ======================================================
+            # ONGLET AUTO
+            # ======================================================
+            with ui.tab_panel(tab_auto):
+
+                with ui.column().classes('items-center gap-3 mt-4 w-full'):
+
+                    def set_mode(mode):
+                        print(f"Mode choisi: {mode}")
+
+                    def update_energy_buttons_auto():
+                        gaz_btn_auto.props(f"color={'red' if energie_mode['value']=='gaz' else 'grey'}")
+                        elec_btn_auto.props(f"color={'green' if energie_mode['value']=='electric' else 'grey'}")
+
+                    def set_gaz_auto():
+                        energie_mode['value'] = 'gaz'
+                        update_energy_buttons_auto()
+
+                    def set_elec_auto():
+                        energie_mode['value'] = 'electric'
+                        update_energy_buttons_auto()
+
+                    ui.button('Économique', on_click=lambda: set_mode('eco')).classes('w-64').props('color=green')
+                    ui.button('Confort', on_click=lambda: set_mode('confort')).classes('w-64').props('color=blue')
+                    ui.button('Écologique', on_click=lambda: set_mode('ecologique')).classes('w-64').props('color=teal')
+
+                    with ui.row().classes('w-full justify-center mt-6'):
+                        with ui.row().classes('items-center gap-4'):
+                            gaz_btn_auto = ui.button('Gaz', on_click=set_gaz_auto).classes('w-32')
+                            elec_btn_auto = ui.button('Électrique', on_click=set_elec_auto).classes('w-32')
+
+                    update_energy_buttons_auto()
+
+                ui.separator()
+
+                # --- PARTIE COMMUNE ---
+                render_common_section(mesure_svc, installation_uuid, capteurs)
 
     dashboard_layout(title='Dashboard', content=content, show_back=False)
+
+
+# ==========================================================
+# PARTIE COMMUNE FACTORISÉE
+# ==========================================================
+
+def render_common_section(mesure_svc, installation_uuid, capteurs):
+
+    ui.label('Mesures actuelles').classes('text-sm font-semibold mt-2')
+
+    with ui.row().classes('w-full gap-2 flex-wrap'):
+
+        with ui.card().classes('p-3 flex-1 min-w-[100px] items-center'):
+            ui.label('Température')
+            temp_label = ui.label('—').classes('text-xl font-bold')
+
+        with ui.card().classes('p-3 flex-1 min-w-[100px] items-center'):
+            ui.label('Humidité')
+            hum_label = ui.label('—').classes('text-xl font-bold')
+
+        with ui.card().classes('p-3 flex-1 min-w-[100px] items-center'):
+            ui.label('CO₂')
+            co2_label = ui.label('—').classes('text-xl font-bold')
+
+    def refresh():
+        mesures = mesure_svc.list_by_installation(installation_uuid, limit=50)
+
+        valeurs = {TYPE_TEMP: None, TYPE_HUM: None, TYPE_CO2: None}
+
+        for m in mesures:
+            tid = m.get('type_mesure_id')
+            if tid in valeurs and valeurs[tid] is None:
+                unite = (m.get('types_mesure') or {}).get('unite', '')
+                val = m.get('value')
+                if val is not None:
+                    valeurs[tid] = f"{val} {unite}".strip()
+
+        temp_label.text = valeurs[TYPE_TEMP] or '—'
+        hum_label.text  = valeurs[TYPE_HUM]  or '—'
+        co2_label.text  = valeurs[TYPE_CO2]  or '—'
+
+    refresh()
+    ui.timer(30.0, refresh)
+
+    ui.separator()
+
+    ui.label('Capteurs enregistrés').classes('text-sm font-semibold')
+
+    if capteurs:
+        for capteur in capteurs[:8]:
+            with ui.row().classes('justify-between w-full'):
+                ui.label(capteur.get('nom', 'Capteur'))
+                ui.label(capteur.get('type', '—')).classes('text-xs text-gray-400')
+    else:
+        ui.label('Aucun capteur.')
