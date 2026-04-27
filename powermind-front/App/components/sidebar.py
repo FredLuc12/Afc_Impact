@@ -307,7 +307,9 @@
 from nicegui import ui
 from app.core.session import SessionManager
 from app.constants import (
-    ROUTE_ADMIN, ROUTE_CONSOMMATION, ROUTE_DATE_HEURE, ROUTE_PROGRAMMATION, 
+    ROUTE_ADMIN, ROUTE_CONSOMMATION, 
+    #ROUTE_DATE_HEURE, 
+    ROUTE_PROGRAMMATION, 
     ROUTE_VALEURS_BASES, ROUTE_LOGOUT, ROUTE_HOME, ROUTE_ADMIN_CAPTEURS
 )
 
@@ -334,7 +336,7 @@ def render_sidebar(drawer) -> None:
         items = [
             {'label': 'Home', 'icon': 'home', 'path': ROUTE_HOME},
             {'label': 'Consommation', 'icon': 'bar_chart', 'path': path_conso},
-            {'label': 'Modifier H/D', 'icon': 'calendar_month', 'path': ROUTE_DATE_HEURE},
+            #{'label': 'Modifier H/D', 'icon': 'calendar_month', 'path': ROUTE_DATE_HEURE},
             {'label': 'Valeurs bases', 'icon': 'tune', 'path': ROUTE_VALEURS_BASES},
             {'label': 'Programmation', 'icon': 'event', 'path': ROUTE_PROGRAMMATION}
         ]

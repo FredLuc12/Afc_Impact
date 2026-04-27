@@ -90,6 +90,7 @@ def valeurs_bases_page(installation_id: str | UUID | None = None) -> None:
             .select("*")
             .eq("installation_id", str(installation_uuid))
             .order("created_at", desc=False)
+            .limit(1)
             .execute()
         )
 
@@ -156,16 +157,16 @@ def valeurs_bases_page(installation_id: str | UUID | None = None) -> None:
                 with ui.column().classes("w-full gap-3"):
 
                     with ui.card().classes("p-4 rounded-xl shadow-sm w-full h-28 flex flex-col justify-between"):
-                        ui.label("État système").classes("font-bold")
-                        ui.label("Tous les capteurs sont opérationnels").classes("text-sm text-gray-500")
+                        ui.label("Mode économique actif").classes("font-bold")
+                        ui.label("Réduction de la consommation énergétique").classes("text-sm text-gray-500")
 
                     with ui.card().classes("p-4 rounded-xl shadow-sm w-full h-28 flex flex-col justify-between"):
-                        ui.label("Performance IA").classes("font-bold")
-                        ui.label("Optimisation en temps réel active").classes("text-sm text-gray-500")
+                        ui.label("Mode confort actif").classes("font-bold")
+                        ui.label("Priorité au bien-être thermique").classes("text-sm text-gray-500")
 
                     with ui.card().classes("p-4 rounded-xl shadow-sm w-full h-28 flex flex-col justify-between"):
-                        ui.label("Dernière mise à jour").classes("font-bold")
-                        ui.label("Synchronisé il y a 2 min").classes("text-sm text-gray-500")
+                        ui.label("Mode écologique actif").classes("font-bold")
+                        ui.label("Réduction de l'empreinte carbone").classes("text-sm text-gray-500")
 
 
     dashboard_layout(

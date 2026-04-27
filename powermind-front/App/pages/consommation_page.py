@@ -60,29 +60,72 @@ def consommation_page(installation_id: str | UUID | None = None) -> None:
             return
 
         # =========================
-        # 📊 TABLEAU
+        # 📊 TABLEAU (infinite scroll auto)
         # =========================
-        rows = []
-        for m in mesures[:5]:
-            print(m)
-            rows.append({
-                "Capteur": (m.get("capteurs") or {}).get("nom", "—"),
-                "Type": (m.get("types_mesure") or {}).get("code", "—"),
-                "Valeur": m.get("value"),
-                "Unité": (m.get("types_mesure") or {}).get("unite", ""),
-                "Date": _fmt_datetime(m.get("created_at", "")),
-            })
+        page_size = 10
+        current_index = 0
+        loading = False  # évite double chargement
 
-        ui.table(
-            columns=[
-                {"name": "Capteur", "label": "Capteur", "field": "Capteur"},
-                {"name": "Type", "label": "Type", "field": "Type"},
-                {"name": "Valeur", "label": "Valeur", "field": "Valeur"},
-                {"name": "Unité", "label": "Unité", "field": "Unité"},
-                {"name": "Date", "label": "Date", "field": "Date"},
-            ],
-            rows=rows,
-        ).classes("w-full")
+        rows: list[dict] = []
+
+        with ui.column().classes("w-full h-80 overflow-auto border rounded") as container:
+            table = ui.table(
+                columns=[
+                    {"name": "Capteur", "label": "Capteur", "field": "Capteur"},
+                    {"name": "Type", "label": "Type", "field": "Type"},
+                    {"name": "Valeur", "label": "Valeur", "field": "Valeur"},
+                    {"name": "Unité", "label": "Unité", "field": "Unité"},
+                    {"name": "Date", "label": "Date", "field": "Date"},
+                ],
+                rows=rows,
+            ).classes("w-full")
+
+
+        def load_more():
+            nonlocal current_index, loading
+
+            if loading:
+                return
+
+            loading = True
+
+            next_chunk = mesures[current_index:current_index + page_size]
+
+            if not next_chunk:
+                loading = False
+                return
+
+            for m in next_chunk:
+                rows.append({
+                    "Capteur": (m.get("capteurs") or {}).get("nom", "—"),
+                    "Type": (m.get("types_mesure") or {}).get("code", "—"),
+                    "Valeur": m.get("value"),
+                    "Unité": (m.get("types_mesure") or {}).get("unite", ""),
+                    "Date": _fmt_datetime(m.get("created_at", "")),
+                })
+
+            current_index += page_size
+            table.update_rows(rows)
+
+            loading = False
+
+
+        # premier chargement
+        load_more()
+
+        # 🔥 Scroll listener JS
+        ui.timer(0.3, lambda: ui.run_javascript(f"""
+        const el = document.querySelector('[data-id="{container.id}"]');
+        if (!el) return;
+
+        const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
+
+        if (nearBottom) {{
+            window.dispatchEvent(new Event("load_more_event"));
+        }}
+        """))
+
+        ui.on("load_more_event", load_more)
 
         # =========================
         # 📈 GRAPH (ECharts)

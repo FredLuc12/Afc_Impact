@@ -1,23 +1,25 @@
 from __future__ import annotations
 from uuid import UUID
 from nicegui import ui
-
+import os   
 from app.core.notifications import notify_error, notify_warning
 from app.core.security import require_same_installation
 from app.core.session import SessionManager
 from app.core.utils import parse_uuid
+from app.core.supabase_client import get_supabase_client
 from app.layouts.dashboard_layout import dashboard_layout
 from app.services.dashboard_service import DashboardService
 from app.services.mesure_service import MesureService
+from src.Energy_Chooser.main import ia_energy_chooser
 
 TYPE_CO2  = 1
 TYPE_HUM  = 2
 TYPE_TEMP = 3
 
-
 def dashboard_page(installation_id: str | UUID | None = None) -> None:
     service    = DashboardService()
     mesure_svc = MesureService()
+
 
     def content() -> None:
         current_installation_id = installation_id or SessionManager.get_installation_id()
@@ -39,6 +41,71 @@ def dashboard_page(installation_id: str | UUID | None = None) -> None:
 
         capteurs = data.get('capteurs') or []
         alertes  = data.get('alertes') or []
+
+        def format_for_model(data):
+            mapping = {
+                "temperature": "temp",
+                "humidite": "humidity",
+                "co2": "co2",
+                "presence": "pir"
+            }
+
+            result = {}
+
+            for row in data:
+                code = row["code"]
+                value = row["value"]
+
+                if code not in mapping:
+                    continue
+
+                key = mapping[code]
+
+                if key == "pir":
+                    result[key] = bool(value) if value is not None else False
+                else:
+                    # autres valeurs numériques
+                    result[key] = float(value) if value is not None else 0
+
+            defaults = {
+                "temp": 0,
+                "humidity": 0,
+                "co2": 0,
+                "pir": False
+            }
+
+            for k, v in defaults.items():
+                if k not in result:
+                    result[k] = v
+
+            return result
+
+        def get_latest_measures():
+            supabase = get_supabase_client()
+            print(installation_uuid)
+            response = supabase.rpc("get_latest_measures_by_installation", {
+                 "installation_uuid": str(installation_uuid)
+             }).execute()
+            response = format_for_model(response.data)
+            print(response)
+            result, weights = ia_energy_chooser(response)
+            print(result)
+            print(weights)
+
+            choix = "gaz" if result == 1 else "electric"
+
+            insert_response = supabase.table("choix_auto").insert({
+                "choix": choix,
+                "installation_id": str(installation_uuid),
+
+                "temp_importance": weights["temp"],
+                "humidity_importance": weights["humidity"],
+                "co2_importance": weights["co2"],
+                "pir_importance": weights["pir"],
+            }).execute()
+
+            update_auto_ui(choix)
+            return insert_response.data
 
         # ==========================
         # STATE
@@ -118,29 +185,40 @@ def dashboard_page(installation_id: str | UUID | None = None) -> None:
 
                 with ui.column().classes('items-center gap-3 mt-4 w-full'):
 
+                    def update_auto_ui(choix: str):
+                        gaz_btn_auto.props(f"color={'green' if choix == 'gaz' else 'grey'}")
+                        elec_btn_auto.props(f"color={'green' if choix == 'electric' else 'grey'}")
+                        ui.notify(f"Choix automatique activé 💡 : {choix }", color='purple')
+
+
                     def set_mode(mode):
-                        print(f"Mode choisi: {mode}")
+                        if mode == 'eco':
+                            gaz_btn_auto.props(f"color=grey")
+                            elec_btn_auto.props(f"color=green")
+                            ui.notify("Mode Économique activé 💡", color='green')
+
+                        elif mode == 'confort':
+                            gaz_btn_auto.props(f"color=green")
+                            elec_btn_auto.props(f"color=grey")
+                            ui.notify("Mode Confort activé 🔥", color='blue')
+                        else:
+                            gaz_btn_auto.props(f"color=grey")
+                            elec_btn_auto.props(f"color=green")
+                            ui.notify("Mode Écologique activé 🌱", color='teal')
 
                     def update_energy_buttons_auto():
                         gaz_btn_auto.props(f"color={'red' if energie_mode['value']=='gaz' else 'grey'}")
                         elec_btn_auto.props(f"color={'green' if energie_mode['value']=='electric' else 'grey'}")
 
-                    def set_gaz_auto():
-                        energie_mode['value'] = 'gaz'
-                        update_energy_buttons_auto()
-
-                    def set_elec_auto():
-                        energie_mode['value'] = 'electric'
-                        update_energy_buttons_auto()
-
+                    ui.button('Déclencher choix auto', on_click=get_latest_measures).classes('w-64').props('color=purple')
                     ui.button('Économique', on_click=lambda: set_mode('eco')).classes('w-64').props('color=green')
                     ui.button('Confort', on_click=lambda: set_mode('confort')).classes('w-64').props('color=blue')
                     ui.button('Écologique', on_click=lambda: set_mode('ecologique')).classes('w-64').props('color=teal')
 
                     with ui.row().classes('w-full justify-center mt-6'):
                         with ui.row().classes('items-center gap-4'):
-                            gaz_btn_auto = ui.button('Gaz', on_click=set_gaz_auto).classes('w-32')
-                            elec_btn_auto = ui.button('Électrique', on_click=set_elec_auto).classes('w-32')
+                            gaz_btn_auto = ui.button('Gaz').classes('w-32')
+                            elec_btn_auto = ui.button('Électrique').classes('w-32')
 
                     update_energy_buttons_auto()
 

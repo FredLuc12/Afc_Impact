@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID
 from nicegui import ui
 
+from src.Energy_Chooser.input.weather import get_weather
 from app.layouts.app_layout import app_layout
 from app.components.action_button import render_action_button
 from app.core.session import SessionManager
@@ -35,13 +36,6 @@ def home_page() -> None:
                 return
             ui.navigate.to(ROUTE_DASHBOARD if target == 'chauffage' else ROUTE_VALEURS_BASES)
 
-        # Récupère le choix propre à CETTE installation (pas global)
-        mode_text = 'MANUEL'
-        if inst_id:
-            current_choix = choix_service.get_by_installation(inst_id)
-            if current_choix:
-                raw = current_choix.choix
-                mode_text = MODE_DISPLAY.get(raw, raw.upper())
 
         temp_int = 'N/A'
         temp_ext = 'N/A'
@@ -50,10 +44,13 @@ def home_page() -> None:
             for m in recent:
                 tm   = m.get('types_mesure') or {}
                 code = tm.get('code')
-                if code == 'TEMP_INT' and temp_int == 'N/A':
+                if code == 'temperature' and temp_int == 'N/A':
                     temp_int = f"{m.get('value', '?')}°C"
-                if code == 'TEMP_EXT' and temp_ext == 'N/A':
-                    temp_ext = f"{m.get('value', '?')}°C"
+                temp_ext_from_api = get_weather()
+                if temp_ext_from_api:
+                    temp_ext = f"{temp_ext_from_api}°C"
+                # if code == 'TEMP_EXT' and temp_ext == 'N/A':
+                #     temp_ext = f"{m.get('value', '?')}°C"
 
         ui.add_head_html('''
         <style>
@@ -119,12 +116,6 @@ def home_page() -> None:
             with ui.element('div').classes('pm-brand-zone'):
                 ui.label('AFS Impact').classes('pm-brand-mark')
                 ui.label('POWER MIND').classes('pm-brand-sub')
-
-            with ui.element('div').classes('pm-landing-meta'):
-                with ui.column().classes('gap-0'):
-                    ui.label(datetime.now().strftime('%d/%m/%Y'))
-                    ui.label(datetime.now().strftime('%H:%M')).style('font-weight: 700')
-                    ui.label(f'Mode: {mode_text}').classes('pm-landing-mode')
 
                 with ui.column().classes('gap-0'):
                     ui.label('Temp. intérieur')
