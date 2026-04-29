@@ -1,8 +1,4 @@
 # app/models/choix_auto.py
-# Structure BDD après migration :
-# id (int8), installation_id (uuid FK), choix (text), created_at (timestamptz)
-# Contrainte UNIQUE sur installation_id → UPSERT possible
-
 from uuid import UUID
 from datetime import datetime
 from app.models.base import AppBaseModel
@@ -11,17 +7,29 @@ from app.models.base import AppBaseModel
 class ChoixAuto(AppBaseModel):
     id: int
     installation_id: UUID
-    choix: str               # 'confort' | 'ecologique' | 'economique'
+    choix: str
+    temp_importance:     float | None = None
+    co2_importance:      float | None = None
+    humidity_importance: float | None = None
+    pir_importance:      float | None = None
     created_at: datetime | None = None
 
 
 class ChoixAutoCreate(AppBaseModel):
     installation_id: UUID
     choix: str
+    temp_importance:     float | None = None
+    co2_importance:      float | None = None
+    humidity_importance: float | None = None
+    pir_importance:      float | None = None
 
 
 class ChoixAutoUpdate(AppBaseModel):
-    choix: str | None = None
+    choix:               str   | None = None
+    temp_importance:     float | None = None
+    co2_importance:      float | None = None
+    humidity_importance: float | None = None
+    pir_importance:      float | None = None
 
 
 class ChoixAutoSummary(AppBaseModel):
