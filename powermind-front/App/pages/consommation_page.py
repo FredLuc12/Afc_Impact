@@ -1,10 +1,9 @@
 # app/pages/consommation_page.py
-# Graphique historique des mesures sur 7 jours par type de capteur
-# IDs BDD : 1=CO2, 2=Humidité, 3=Température, 4=Présence
-
 from __future__ import annotations
-from uuid import UUID
+
+from collections import defaultdict
 from datetime import datetime
+from uuid import UUID
 
 from nicegui import ui
 
@@ -14,28 +13,20 @@ from app.core.session import SessionManager
 from app.core.utils import parse_uuid
 from app.layouts.dashboard_layout import dashboard_layout
 from app.services.mesure_service import MesureService
-from app.services.choix_auto_service import ChoixAutoService
-
-# Mapping type_mesure_id → label affichage
-TYPES = {
-    3: {'label': 'Température', 'unite': '°C',  'color': '#ef6670', 'icon': 'device_thermostat'},
-    2: {'label': 'Humidité',    'unite': '%',   'color': '#5c67ec', 'icon': 'water_drop'},
-    1: {'label': 'CO₂',        'unite': 'ppm', 'color': '#f59e0b', 'icon': 'co2'},
-}
 
 
-def _fmt_heure(iso: str) -> str:
-    """Formate un timestamp ISO en heure lisible."""
+def _fmt_datetime(iso: str) -> str:
     try:
         dt = datetime.fromisoformat(iso.replace('Z', '+00:00'))
-        return dt.strftime('%d/%m %H:%M')
+        return dt.strftime('%d/%m/%Y %H:%M')
     except Exception:
-        return iso[:10]
+        return iso[:16] if iso else '—'
 
 
 def consommation_page(installation_id: str | UUID | None = None) -> None:
-    mesure_svc = MesureService()
-    choix_svc  = ChoixAutoService()
+    # MesureService.list_by_installation() fait la jointure :
+    #   capteurs!inner(id, nom, installation_id) + types_mesure(id, code, unite)
+    svc = MesureService()
 
     def content() -> None:
         current_installation_id = installation_id or SessionManager.get_installation_id()
@@ -49,112 +40,134 @@ def consommation_page(installation_id: str | UUID | None = None) -> None:
         if not require_same_installation(str(installation_uuid)):
             return
 
-        # Dernier choix auto
-        latest_choix = choix_svc.get_by_installation(installation_uuid)
-        mode_actif   = (latest_choix.choix if latest_choix else '—').upper()
-        couleur_mode = '#5c67ec' if mode_actif == 'ELECTRIC' else '#f59e0b'
+        # ─── Mesures avec nom du capteur ──────────────────────────────────
+        # list_by_installation retourne des dicts avec clés :
+        #   id, value, created_at, capteur_id, type_mesure_id,
+        #   capteurs: {id, nom, installation_id},
+        #   types_mesure: {id, code, unite}
+        raw = svc.list_by_installation(installation_uuid, limit=100)
 
-        ui.label('Historique des mesures sur 7 jours.').classes('text-[#9ca4ae] text-sm -mt-1')
+        if not raw:
+            ui.label("Aucune donnée").classes("text-red-500")
+            return
 
-        # --- KPI mode actif ---
-        with ui.card().classes('w-full p-4 mb-1'):
-            with ui.row().classes('items-center gap-3'):
-                ui.icon('bolt', color='blue').classes('text-3xl')
-                with ui.column().classes('gap-0'):
-                    ui.label('Mode énergétique actif').classes('text-xs text-gray-400')
-                    ui.label(mode_actif).style(f'font-size:1.3rem;font-weight:700;color:{couleur_mode}')
+        # Aplatir pour le tableau
+        all_mesures: list[dict] = []
+        for m in raw:
+            capteur     = m.get('capteurs')     or {}
+            type_mesure = m.get('types_mesure') or {}
+            all_mesures.append({
+                "Capteur": capteur.get('nom', '—'),
+                "Type":    type_mesure.get('code', '—'),
+                "Valeur":  m.get('value'),
+                "Unité":   type_mesure.get('unite', ''),
+                "Date":    _fmt_datetime(m.get('created_at', '')),
+            })
 
-        # --- Sélecteur de type de mesure ---
-        type_selectionne = {'id': 3}  # Température par défaut
+        # =========================
+        # 📊 TABLEAU (infinite scroll)
+        # =========================
+        page_size     = 10
+        current_index = 0
+        loading       = False
+        rows: list[dict] = []
 
-        graphique_container = ui.column().classes('w-full')
+        with ui.column().classes("w-full h-80 overflow-auto border rounded") as container:
+            table = ui.table(
+                columns=[
+                    {"name": "Capteur", "label": "Capteur", "field": "Capteur"},
+                    {"name": "Type",    "label": "Type",    "field": "Type"},
+                    {"name": "Valeur",  "label": "Valeur",  "field": "Valeur"},
+                    {"name": "Unité",   "label": "Unité",   "field": "Unité"},
+                    {"name": "Date",    "label": "Date",    "field": "Date"},
+                ],
+                rows=rows,
+            ).classes("w-full")
 
-        def afficher_graphique(type_id: int):
-            graphique_container.clear()
-            meta = TYPES.get(type_id, {'label': '?', 'unite': '', 'color': '#888', 'icon': 'sensors'})
+        def load_more():
+            nonlocal current_index, loading
+            if loading:
+                return
+            loading = True
+            chunk = all_mesures[current_index:current_index + page_size]
+            if not chunk:
+                loading = False
+                return
+            rows.extend(chunk)
+            current_index += page_size
+            table.update_rows(rows)
+            loading = False
 
-            with graphique_container:
-                historique = mesure_svc.list_historique_par_type(
-                    installation_uuid, type_id, jours=7, limit=200
-                )
+        load_more()
 
-                if not historique:
-                    with ui.card().classes('w-full p-6 items-center'):
-                        ui.icon('bar_chart', color='grey').classes('text-4xl')
-                        ui.label('Aucune donnée sur les 7 derniers jours.').classes('text-sm text-gray-400')
-                    return
+        ui.timer(0.3, lambda: ui.run_javascript(f"""
+        const el = document.querySelector('[data-id="{container.id}"]');
+        if (!el) return;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) {{
+            window.dispatchEvent(new Event("load_more_event"));
+        }}
+        """))
+        ui.on("load_more_event", load_more)
 
-                valeurs   = [h['value'] for h in historique if h['value'] is not None]
-                etiquettes = [_fmt_heure(h['created_at']) for h in historique if h['value'] is not None]
+        # =========================
+        # 📈 GRAPH (ECharts)
+        # raw est trié desc → on inverse pour affichage chronologique
+        # =========================
+        series_data:  dict[str, list] = defaultdict(list)
+        dates_by_type: dict[str, list] = defaultdict(list)
 
-                if not valeurs:
-                    ui.label('Données insuffisantes.').classes('text-sm text-gray-400')
-                    return
+        for m in reversed(raw):
+            type_mesure = m.get('types_mesure') or {}
+            code  = type_mesure.get('code', 'unknown')
+            value = m.get('value')
+            date  = _fmt_datetime(m.get('created_at', ''))
+            series_data[code].append(value)
+            dates_by_type[code].append(date)
 
-                val_min = min(valeurs)
-                val_max = max(valeurs)
-                val_moy = round(sum(valeurs) / len(valeurs), 1)
+        first_code = next(iter(series_data), None)
+        x_dates = dates_by_type[first_code] if first_code else []
 
-                # KPI min/moy/max
-                with ui.row().classes('w-full gap-2 flex-wrap mb-2'):
-                    for libelle, val in [('Min', val_min), ('Moy', val_moy), ('Max', val_max)]:
-                        with ui.card().classes('p-3 flex-1 min-w-[80px] items-center'):
-                            ui.label(libelle).classes('text-xs text-gray-400')
-                            ui.label(f"{val} {meta['unite']}").classes('text-base font-bold text-slate-700')
+        ui.echart({
+            "title":   {"text": "Évolution des mesures"},
+            "tooltip": {"trigger": "axis"},
+            "legend":  {"data": list(series_data.keys())},
+            "xAxis":   {"type": "category", "data": x_dates},
+            "yAxis":   {"type": "value"},
+            "series": [
+                {"name": code, "type": "line", "smooth": True, "data": values}
+                for code, values in series_data.items()
+            ],
+        }).classes("w-full h-96 mt-6")
 
-                # Graphique ECharts
-                with ui.card().classes('w-full p-3'):
-                    # On ne prend que les 50 derniers points pour la lisibilité
-                    pts   = valeurs[-50:]
-                    lbls  = etiquettes[-50:]
+        # =========================
+        # 📋 STATS PAR TYPE
+        # =========================
+        ui.label("Statistiques").classes("text-lg font-bold mt-6 mb-2")
 
-                    echart = ui.echart({
-                        'tooltip': {
-                            'trigger': 'axis',
-                            'formatter': f'{{b}}<br/>{{a}}: {{c}} {meta["unite"]}',
-                        },
-                        'grid': {'left': '8%', 'right': '4%', 'bottom': '18%', 'top': '8%'},
-                        'xAxis': {
-                            'type': 'category',
-                            'data': lbls,
-                            'axisLabel': {'rotate': 35, 'fontSize': 10},
-                        },
-                        'yAxis': {
-                            'type': 'value',
-                            'name': meta['unite'],
-                            'nameTextStyle': {'fontSize': 10},
-                        },
-                        'series': [{
-                            'name': meta['label'],
-                            'type': 'line',
-                            'data': pts,
-                            'smooth': True,
-                            'lineStyle': {'color': meta['color'], 'width': 2},
-                            'itemStyle': {'color': meta['color']},
-                            'areaStyle': {'color': meta['color'], 'opacity': 0.08},
-                            'symbol': 'circle',
-                            'symbolSize': 4,
-                        }],
-                    }).classes('w-full').style('height: 220px')
+        stats_by_type: dict[str, dict] = {}
+        for m in raw:
+            type_mesure = m.get('types_mesure') or {}
+            code  = type_mesure.get('code')
+            unite = type_mesure.get('unite', '')
+            value = m.get('value')
+            if not code or value is None:
+                continue
+            if code not in stats_by_type:
+                stats_by_type[code] = {'values': [], 'unite': unite}
+            try:
+                stats_by_type[code]['values'].append(float(value))
+            except (TypeError, ValueError):
+                pass
 
-                ui.label(f"{len(valeurs)} mesure(s) sur 7 jours.").classes('text-[10px] text-gray-300 text-right w-full')
+        with ui.row().classes("w-full gap-3 flex-wrap"):
+            for code, s in stats_by_type.items():
+                vals = s['values']
+                if not vals:
+                    continue
+                with ui.card().classes("p-3 min-w-[140px]"):
+                    ui.label(code).classes("font-semibold")
+                    ui.label(f"Min : {round(min(vals), 1)} {s['unite']}").classes("text-xs text-gray-500")
+                    ui.label(f"Max : {round(max(vals), 1)} {s['unite']}").classes("text-xs text-gray-500")
+                    ui.label(f"Moy : {round(sum(vals)/len(vals), 1)} {s['unite']}").classes("text-xs text-gray-500")
 
-        # Boutons de sélection du type
-        with ui.row().classes('w-full gap-2 mb-2 flex-wrap'):
-            for tid, meta in TYPES.items():
-                def make_handler(t=tid):
-                    def handler():
-                        type_selectionne['id'] = t
-                        afficher_graphique(t)
-                    return handler
-                btn_color = 'blue-6' if tid == 3 else 'grey-5'
-                ui.button(
-                    meta['label'],
-                    icon=meta['icon'],
-                    on_click=make_handler()
-                ).props(f'color={btn_color} outline').classes('text-xs')
-
-        # Affichage initial
-        afficher_graphique(type_selectionne['id'])
-
-    dashboard_layout(title='Consommation', content=content, show_back=True)
+    dashboard_layout(title="Mesures", content=content, show_back=True)

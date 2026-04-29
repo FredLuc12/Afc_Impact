@@ -1,5 +1,5 @@
 import requests
-from constant import url
+from src.Energy_Chooser.constant import url
 from dotenv import load_dotenv
 import os
 

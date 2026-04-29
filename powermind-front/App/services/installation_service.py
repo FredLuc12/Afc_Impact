@@ -21,6 +21,7 @@ class InstallationService(BaseService):
         return [Installation(**item) for item in data]
 
     def list_by_user(self, user_id: UUID) -> list[Installation]:
+        print(user_id)
         response = (
             self.table()
             .select('*')
@@ -28,6 +29,7 @@ class InstallationService(BaseService):
             .order('created_at', desc=True)
             .execute()
         )
+        print(response.data)
         data = self.extract_data(response) or []
         return [Installation(**item) for item in data]
 

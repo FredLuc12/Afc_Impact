@@ -1,4 +1,4 @@
-from input.weather import get_weather
+from src.Energy_Chooser.input.weather import get_weather
 
 
 def cop():

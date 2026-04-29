@@ -1,30 +1,30 @@
 # app/models/profile.py
+# BDD réelle : id (uuid), email (text), role (text), created_at (timestamptz)
 
-from datetime import datetime
 from uuid import UUID
-
-from pydantic import EmailStr
-
-from app.models.base import AppBaseModel, UserRole, UUIDTimestampedModel, UUIDModel
+from datetime import datetime
+from app.models.base import AppBaseModel, UserRole
 
 
-class ProfileBase(AppBaseModel):
-    email: EmailStr
+class Profile(AppBaseModel):
+    id: UUID
+    email: str | None = None
+    role: UserRole = 'user'
+    created_at: datetime | None = None
+
+
+class ProfileCreate(AppBaseModel):
+    id: UUID
+    email: str | None = None
     role: UserRole = 'user'
 
 
-class Profile(ProfileBase, UUIDTimestampedModel):
-    pass
-
-
-class ProfileCreate(ProfileBase):
-    id: UUID
-
-
 class ProfileUpdate(AppBaseModel):
-    email: EmailStr | None = None
+    email: str | None = None
     role: UserRole | None = None
 
 
-class ProfileSummary(ProfileBase, UUIDModel):
-    pass
+class ProfileSummary(AppBaseModel):
+    id: UUID
+    email: str | None = None
+    role: UserRole

@@ -9,7 +9,7 @@ from app.constants import (
     ROUTE_CAPTEURS,
     ROUTE_CONSOMMATION,
     ROUTE_DASHBOARD,
-    ROUTE_DATE_HEURE,
+    #ROUTE_DATE_HEURE,
     ROUTE_HOME,
     ROUTE_INSTALLATIONS,
     ROUTE_LOGIN,
@@ -173,11 +173,11 @@ def register_routes() -> None:
             return
         valeurs_bases_page()
 
-    @ui.page(ROUTE_DATE_HEURE)
-    def date_heure():
-        if not require_auth():
-            return
-        date_heure_page()
+    # @ui.page(ROUTE_DATE_HEURE)
+    # def date_heure():
+    #     if not require_auth():
+    #         return
+    #     date_heure_page()
 
     @ui.page(ROUTE_PROFIL)
     def profil():

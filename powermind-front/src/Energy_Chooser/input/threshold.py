@@ -1,4 +1,4 @@
-from constant import constraint
+from src.Energy_Chooser.constant import constraint
 
 def threshold_captor(captor):
     if captor["co2"] > constraint.MAX_CO2[0]:

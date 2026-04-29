@@ -1,10 +1,10 @@
 import random
-from input.captor import DATA
-from input.threshold import threshold_captor
-from input.efficiency import cop, gaz_capacity
-from input import price
-from constant import constraint,path
-from function import normalize, csv
+from src.Energy_Chooser.input.captor import DATA
+from src.Energy_Chooser.input.threshold import threshold_captor
+from src.Energy_Chooser.input.efficiency import cop, gaz_capacity
+from src.Energy_Chooser.input import price
+from src.Energy_Chooser.constant import constraint,path
+from src.Energy_Chooser.function import normalize, csv
 import pandas as pd
 
 def energy_cost(temp,humidity,co2,pir):
