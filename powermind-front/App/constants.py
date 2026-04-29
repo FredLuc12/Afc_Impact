@@ -56,6 +56,7 @@ ROUTE_404 = '/404'
 ROUTE_WAITING = '/waiting'
 ROUTE_PROGRAMMATION = '/programmation'
 ROUTE_ADMIN_CAPTEURS = '/admin/capteurs'
+ROUTE_ADMIN_INSTALLATIONS = '/admin/installations_page'
 
 PUBLIC_ROUTES = {
     ROUTE_ROOT,

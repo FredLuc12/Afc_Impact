@@ -1,7 +1,5 @@
 # app/models/installation.py
-
 from uuid import UUID
-
 from app.models.base import AppBaseModel, UUIDTimestampedModel, UUIDModel
 
 
@@ -19,7 +17,8 @@ class InstallationCreate(InstallationBase):
 
 
 class InstallationUpdate(AppBaseModel):
-    nom: str | None = None
+    nom:     str  | None = None
+    user_id: UUID | None = None   # ← manquait
 
 
 class InstallationSummary(InstallationBase, UUIDModel):

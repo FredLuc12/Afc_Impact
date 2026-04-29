@@ -9,6 +9,7 @@ from app.constants import (
     ROUTE_CAPTEURS,
     ROUTE_CONSOMMATION,
     ROUTE_DASHBOARD,
+    ROUTE_ADMIN_INSTALLATIONS,
     #ROUTE_DATE_HEURE,
     ROUTE_HOME,
     ROUTE_INSTALLATIONS,
@@ -26,6 +27,7 @@ from app.constants import (
     ROUTE_WAITING,
     ROUTE_PROGRAMMATION,
     ROUTE_ADMIN_CAPTEURS,
+    ROUTE_ADMIN_INSTALLATIONS,
 )
 from app.core.security import require_auth, require_role
 from app.core.session import SessionManager
@@ -48,6 +50,9 @@ from app.pages.forgot_password_page import forgot_password_page
 from app.pages.waiting_page import waiting_activation_page
 from app.pages.programmation_page import programmation_page
 from app.pages.admin.admin_capteurs_page import admin_capteurs_page
+# from app.pages.admin import admin_installations_page
+from app.pages.admin.admin_capteurs_page import admin_capteurs_page as _admin_capteurs_page
+from app.pages.admin.admin_installations_page import admin_installations_page as _admin_installations_page
 
 
 def is_authenticated() -> bool:
@@ -196,6 +201,18 @@ def register_routes() -> None:
         if not require_role('admin', 'technicien'):
             return
         maintenance_page()
+    
+    @ui.page(ROUTE_ADMIN_CAPTEURS)
+    def admin_capteurs():
+        if not require_role('admin', 'super_admin'):
+            return
+        _admin_capteurs_page()   # ← alias propre, plus d'import local
+
+    @ui.page(ROUTE_ADMIN_INSTALLATIONS)
+    def admin_installations():
+        if not require_role('admin', 'super_admin'):
+            return
+        _admin_installations_page()
 
     @ui.page('/forgot-password')
     def forgot_password():

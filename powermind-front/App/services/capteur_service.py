@@ -43,15 +43,30 @@ class CapteurService(BaseService):
         data = self.extract_data(response) or []
         return [Capteur(**item) for item in data]
 
+    # def create(self, payload: CapteurCreate) -> Capteur:
+    #     response = self.table().insert(payload.model_dump()).execute()
+    #     data = self.extract_data(response)[0]
+    #     return Capteur(**data)
+
+    # def update(self, capteur_id: UUID, payload: CapteurUpdate) -> Capteur:
+    #     response = (
+    #         self.table()
+    #         .update(payload.model_dump(exclude_none=True))
+    #         .eq('id', str(capteur_id))
+    #         .execute()
+    #     )
+    #     data = self.extract_data(response)[0]
+    #     return Capteur(**data)
+
     def create(self, payload: CapteurCreate) -> Capteur:
-        response = self.table().insert(payload.model_dump()).execute()
+        response = self.table().insert(payload.model_dump(mode='json')).execute()  # ← mode='json'
         data = self.extract_data(response)[0]
         return Capteur(**data)
 
     def update(self, capteur_id: UUID, payload: CapteurUpdate) -> Capteur:
         response = (
             self.table()
-            .update(payload.model_dump(exclude_none=True))
+            .update(payload.model_dump(mode='json', exclude_none=True))  # ← mode='json'
             .eq('id', str(capteur_id))
             .execute()
         )
@@ -60,8 +75,6 @@ class CapteurService(BaseService):
 
     def delete(self, capteur_id: UUID):
         return self.table().delete().eq('id', str(capteur_id)).execute()
-
-    # --- AJOUTS POUR L'INTERFACE ADMIN (EF14) ---
 
     def list_all_with_details(self) -> list[dict[str, Any]]:
         """Récupère tous les capteurs avec le nom de l'installation (via self.table())"""

@@ -5,7 +5,8 @@ from app.constants import (
     ROUTE_ADMIN, ROUTE_CONSOMMATION, 
     ROUTE_DATE_HEURE, 
     ROUTE_PROGRAMMATION, 
-    ROUTE_VALEURS_BASES, ROUTE_LOGOUT, ROUTE_HOME, ROUTE_ADMIN_CAPTEURS
+    ROUTE_VALEURS_BASES, ROUTE_LOGOUT, ROUTE_HOME, ROUTE_ADMIN_CAPTEURS,
+    ROUTE_ADMIN_INSTALLATIONS,
 )
 
 def render_sidebar(drawer) -> None:
@@ -26,6 +27,7 @@ def render_sidebar(drawer) -> None:
             #{'label': 'Modifier H/D', 'icon': 'calendar_month', 'path': ROUTE_DATE_HEURE},
             {'label': 'Valeurs bases', 'icon': 'tune', 'path': ROUTE_VALEURS_BASES},
             {'label': 'Gérer capteurs', 'icon': 'sensors', 'path': ROUTE_ADMIN_CAPTEURS},
+            {'label': 'Gérer installations', 'icon': 'apartment',          'path': ROUTE_ADMIN_INSTALLATIONS}
         ]
     else:
         items = [
